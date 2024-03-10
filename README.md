@@ -1,8 +1,8 @@
 # UniSolder - The universal soldering controller  ![License CC-BY-4.0](https://img.shields.io/badge/License-CC--BY--4.0-green.svg)
 Control almost any low voltage soldering instrument
 
-[![Windows Unisolder application](https://github.com/PBrunot/UniSolder-5.2/actions/workflows/build-windows.yaml/badge.svg)](https://github.com/PBrunot/UniSolder-5.2/actions/workflows/build-windows.yaml)
-[![Unisolder firmware](https://github.com/PBrunot/UniSolder-5.2/actions/workflows/build-firmware.yaml/badge.svg)](https://github.com/PBrunot/UniSolder-5.2/actions/workflows/build-firmware.yaml)
+[![Build Windows Unisolder application](https://github.com/fablab-bergamo/UniSolder-5.2/actions/workflows/build-windows.yaml/badge.svg)](https://github.com/fablab-bergamo/UniSolder-5.2/actions/workflows/build-windows.yaml)
+[![Build Unisolder firmware](https://github.com/fablab-bergamo/UniSolder-5.2/actions/workflows/build-firmware.yaml/badge.svg)](https://github.com/fablab-bergamo/UniSolder-5.2/actions/workflows/build-firmware.yaml)
 
 <img width=500 align="center" src="/img/UniSolder52_small.jpg"/>
 

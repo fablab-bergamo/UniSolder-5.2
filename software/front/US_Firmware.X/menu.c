@@ -351,6 +351,13 @@ void OLEDTasks(int powerLost){
                     }
                     OLEDFlags.f.Version = 1;
                     break;
+                case FORCE_INSTRUMENT:
+                    ModeTicks = 250;
+                    if(BTicks[1].o && !BTicks[1].n){
+                        CMode = DEFAULT_MENU;
+                        break;
+                    }
+                    break;
                 case STANDBY: //stand-by
                     if(((pars.WakeUp & 1) && BTicks[1].o <= 50 && BTicks[1].n > 50) ||
                        ((pars.WakeUp & 2) && mainFlags.HolderPresent && FNAP && OldNAP != FNAP)){ //exit from stand-by

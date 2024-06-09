@@ -68,6 +68,7 @@ IRON_H_EXTERN UINT16 IronID;
 IRON_H_EXTERN volatile t_IronPars IronPars;
 IRON_H_EXTERN void IronInit();
 IRON_H_EXTERN void IronTasks();
+IRON_H_EXTERN const char* IronDesc(UINT8 index);
 
 #undef IRON_H_EXTERN
 

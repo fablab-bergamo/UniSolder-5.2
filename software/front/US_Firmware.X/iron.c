@@ -863,7 +863,7 @@ void IronIdentify(){
         const int nb_irons = sizeof(Irons) / sizeof(Irons[0]);
         if (pars.FixedInstr > 1 && pars.FixedInstr < nb_irons + 1)
         {
-            NewIronID.Val = Irons[pars.FixedInstr - 1].ID;
+            NewIronID.Val = Irons[pars.FixedInstr - 1].ID.Val;
         }
     }
 
@@ -933,6 +933,16 @@ void IronTasks(){
             }
         }
     }
+}
+
+const char* IronDesc(UINT8 index)
+{
+    static const char* UNKNOWN = "?\0";
+
+    if (index >=0 && index < (sizeof(Irons) / sizeof(Irons[0])))
+        return Irons[index].Name;
+
+    return UNKNOWN;
 }
 
 #undef _IRON_C

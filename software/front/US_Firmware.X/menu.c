@@ -180,7 +180,7 @@ void OLEDTasks(int powerLost){
                         ModeTicks = 100;
                         if(EncDiff){
                             int ctt = TTemp;
-                            ctt += EncDiff * pars.TempStep;;
+                            ctt += EncDiff * pars.TempStep;
                             EncDiff = 0;
                             if(ctt < MINTEMP) ctt = MINTEMP;
                             if(ctt > MAXTEMP) ctt = MAXTEMP;
@@ -241,7 +241,7 @@ void OLEDTasks(int powerLost){
                             if((EncDiff < 0 && !pars.MenuDown) || (EncDiff > 0 && pars.MenuDown)){CPar--; CRow--;}
                             EncDiff = 0;
                             if(CRow < 0)CRow = 0;
-                            if(CRow > 3)CRow = 3;
+                            if(CRow > 3) CRow = 3;
                             if(CPar < 0)CPar = (sizeof(MenuOrder) / sizeof(MenuOrder[0])) - 1;
                             if(CPar >= (sizeof(MenuOrder) / sizeof(MenuOrder[0]))) CPar = 0;
                         }
@@ -254,7 +254,7 @@ void OLEDTasks(int powerLost){
                                 case 17: //Instrument info
                                     CMode=INSTRUMENT_INFO;
                                     break;
-                                case 19: //Version info
+                                case 20: //Version info
                                     CMode=VERSION_INFO;
                                     break;
                                 default:
@@ -350,13 +350,6 @@ void OLEDTasks(int powerLost){
                         break;
                     }
                     OLEDFlags.f.Version = 1;
-                    break;
-                case FORCE_INSTRUMENT:
-                    ModeTicks = 250;
-                    if(BTicks[1].o && !BTicks[1].n){
-                        CMode = DEFAULT_MENU;
-                        break;
-                    }
                     break;
                 case STANDBY: //stand-by
                     if(((pars.WakeUp & 1) && BTicks[1].o <= 50 && BTicks[1].n > 50) ||

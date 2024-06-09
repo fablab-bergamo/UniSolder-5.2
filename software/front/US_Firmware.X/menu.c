@@ -57,6 +57,7 @@ static union {
         int Debug:1;
         int Input:1;
         int Version:1;
+        int FixedInstr:1;
     }f;
 }OLEDFlags;
 
@@ -257,6 +258,9 @@ void OLEDTasks(int powerLost){
                                 case 19: //Version info
                                     CMode=VERSION_INFO;
                                     break;
+                                case 20: // Fix instrument
+                                    CMode=FORCE_INSTRUMENT;
+                                    break;
                                 default:
                                     CMode=SET_PARAMS;
                                     break;
@@ -350,6 +354,14 @@ void OLEDTasks(int powerLost){
                         break;
                     }
                     OLEDFlags.f.Version = 1;
+                    break;
+                case FORCE_INSTRUMENT:
+                    ModeTicks = 250;
+                    if(BTicks[1].o && !BTicks[1].n){
+                        CMode = DEFAULT_MENU;
+                        break;
+                    }
+                    OLEDFlags.f.FixedInstr = 1;
                     break;
                 case STANDBY: //stand-by
                     if(((pars.WakeUp & 1) && BTicks[1].o <= 50 && BTicks[1].n > 50) ||
@@ -601,6 +613,11 @@ void OLEDTasks(int powerLost){
         OLEDPrintHex68(60, 3, 2, VERSION_MINOR);/*as hex to display 2 digits*/
         OLEDPrint68(0,4,"FW CRC:", 0);
         OLEDPrintHex68(54, 4, 4, APP_CRC_VALUE);
+    }
+
+    if(OLEDFlags.f.FixedInstr){
+        OLEDPrint68(0,0,"FIX INSTRUMENT", 0);
+        OLEDPrint68(0,2,"CHOOSE:", 0);
     }
 
     if(InvertTicks) OLEDInvert(0, 128, 0, 8);

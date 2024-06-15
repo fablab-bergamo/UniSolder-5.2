@@ -84,7 +84,7 @@ const t_IronPars NoIronPars = {
     NULL
 };
 
-const t_IronPars Irons[] = {
+const t_IronPars Irons[NB_IRONS] = {
     {
         0, 
         {0x1011},
@@ -937,9 +937,9 @@ void IronTasks(){
 
 const char* IronDesc(UINT8 index)
 {
-    static const char* UNKNOWN = "?\0";
+    static const char UNKNOWN[24] = "?                       ";
 
-    if (index >=0 && index < (sizeof(Irons) / sizeof(Irons[0])))
+    if (index >=0 && index < NB_IRONS)
         return Irons[index].Name;
 
     return UNKNOWN;

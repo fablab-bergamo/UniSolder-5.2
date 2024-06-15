@@ -65,7 +65,7 @@ void ParDispInstr(int par, int col, int row, int num){
     }
     const char* desc = IronDesc(num - 1);
     OLEDPrint68(col, row, desc, 6);
-    OLEDPrint68(col, row + 1, desc[6], 6);
+    OLEDPrint68(col, row + 1, &desc[6], 6);
 }
 
 void ParDispNum(int par, int col, int row, int num){

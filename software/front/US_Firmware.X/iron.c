@@ -860,8 +860,8 @@ void IronIdentify(){
     else
     {
         // Override detection with fixed settings
-        const int nb_irons = sizeof(Irons) / sizeof(Irons[0]);
-        if (pars.FixedInstr > 1 && pars.FixedInstr < nb_irons + 1)
+        // FixedInstr value 0 is reserved value for AUTO mode
+        if (pars.FixedInstr > 1 && pars.FixedInstr < NB_IRONS + 1)
         {
             NewIronID.Val = Irons[pars.FixedInstr - 1].ID.Val;
         }

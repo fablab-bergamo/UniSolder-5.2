@@ -55,15 +55,17 @@ void ParDispStr(int par, int col, int row, int num){
 }
 
 void ParDispInstr(int par, int col, int row, int num){
-    static const char* AUTO = "AUTO";
+    static const char* AUTO = " AUTO ";
     
     if (num == 0)
     {
-        OLEDPrint88(col, row, AUTO, 4);
+        OLEDPrint68(col, row, AUTO, 6);
+        OLEDPrint68(col, row + 1, "      ", 6);
         return;
     }
     const char* desc = IronDesc(num - 1);
-    OLEDPrint88(col - 1, row, desc, 7);
+    OLEDPrint68(col, row, desc, 6);
+    OLEDPrint68(col, row + 1, desc[6], 6);
 }
 
 void ParDispNum(int par, int col, int row, int num){

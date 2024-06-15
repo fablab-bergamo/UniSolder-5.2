@@ -84,7 +84,7 @@ const t_IronPars NoIronPars = {
     NULL
 };
 
-const t_IronPars Irons[] = {
+const t_IronPars Irons[NB_IRONS] = {
     {
         0, 
         {0x1011},
@@ -712,7 +712,7 @@ const t_IronPars Irons[] = {
 
     {
         0, 
-        {0x1803},
+        {0x180C},
         "WELLER WSP80            ",
         {
             {
@@ -828,31 +828,44 @@ void IronIdentify(){
     ID_3S = 1;
     ID_OUT = 1;
     mcuADCStartManualAVdd();
-
-    _delay_us(1000);
-    w = mcuADCReadWait(ADCH_ID, 16) >> 4;
-    HCH = 1;
-    for(i = 0; i <= 24; i++)if(w < IDHash[i])break;
-    CID.v[0] = i;
-
-    _delay_us(1000);
-    w = mcuADCReadWait(ADCH_ID, 16) >> 4;
-    HCH=0;
-    for(i = 0; i <= 24; i++)if(w < IDHash[i])break;
-    CID.v[1] = i;
     
-    NewIronID.Val = 0x1919;
-    if(CID.Val == OID.Val){
-        if(IDCnt < 255)IDCnt++;
-        if(IDCnt > 2)NewIronID.Val = CID.Val;
+    if (pars.FixedInstr == 0)
+    {
+        _delay_us(1000);
+        w = mcuADCReadWait(ADCH_ID, 16) >> 4;
+        HCH = 1;
+        for(i = 0; i <= 24; i++)if(w < IDHash[i])break;
+        CID.v[0] = i;
+
+        _delay_us(1000);
+        w = mcuADCReadWait(ADCH_ID, 16) >> 4;
+        HCH=0;
+        for(i = 0; i <= 24; i++)if(w < IDHash[i])break;
+        CID.v[1] = i;
+        
+        NewIronID.Val = 0x1919;
+        if(CID.Val == OID.Val){
+            if(IDCnt < 255)IDCnt++;
+            if(IDCnt > 2)NewIronID.Val = CID.Val;
+        }
+        else{
+            IDCnt = 0;
+        }
+        
+        OID.Val = CID.Val;
+
+        if(NewIronID.v[0] >= 0x19)NewIronID.v[0] = NewIronID.v[1];
+        if(NewIronID.v[1] >= 0x19)NewIronID.v[1] = NewIronID.v[0];
     }
-    else{
-        IDCnt = 0;
+    else
+    {
+        // Override detection with fixed settings
+        const int nb_irons = sizeof(Irons) / sizeof(Irons[0]);
+        if (pars.FixedInstr > 1 && pars.FixedInstr < nb_irons + 1)
+        {
+            NewIronID.Val = Irons[pars.FixedInstr - 1].ID.Val;
+        }
     }
-    OID.Val = CID.Val;
-    
-    if(NewIronID.v[0] >= 0x19)NewIronID.v[0] = NewIronID.v[1];
-    if(NewIronID.v[1] >= 0x19)NewIronID.v[1] = NewIronID.v[0];
 
     if(NewIronID.Val != 0x1919){
         if(IronID != NewIronID.Val){
@@ -920,6 +933,16 @@ void IronTasks(){
             }
         }
     }
+}
+
+const char* IronDesc(UINT8 index)
+{
+    static const char UNKNOWN[24] = "?                       ";
+
+    if (index >=0 && index < NB_IRONS)
+        return Irons[index].Name;
+
+    return UNKNOWN;
 }
 
 #undef _IRON_C

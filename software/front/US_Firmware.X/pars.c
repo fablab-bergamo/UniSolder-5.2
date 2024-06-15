@@ -46,7 +46,7 @@ const t_ParDef ParDef[] = {
     {" CALIBRATE ",   0,       0,       0, 0,            0, 0,            0}, //16
     {" INST.INFO ",   0,       0,       0, 0,            0, 0,            0}, //17
     {" TEMP.STEP ",   1,       1,      25, 0,            0, 0,            &ParDispTemp}, //18
-    {" FIX INSTR ",   0,       0,     255, 0,            0, 0,            &ParDispInstr}, //19
+    {"   MODEL   ",   0,       0,     255, 0,            0, 0,            &ParDispInstr}, //19
     {"   VERSION ",   0,       0,       0, 0,            0, 0,            0}, //20
 };
 
@@ -55,14 +55,14 @@ void ParDispStr(int par, int col, int row, int num){
 }
 
 void ParDispInstr(int par, int col, int row, int num){
-    static const char* AUTO = "AUTO\0";
+    static const char* AUTO = "AUTO";
     
     if (num == 0)
     {
-        OLEDPrint816(col, row, AUTO, 0);
+        OLEDPrint88(col, row, AUTO, 4);
     }
     const char* desc = IronDesc(num - 1);
-    OLEDPrint816(col, row, desc, 0);
+    OLEDPrint88(col, row, desc, 8);
 }
 
 void ParDispNum(int par, int col, int row, int num){

@@ -4,7 +4,7 @@ Control almost any low voltage soldering instrument
 > [!IMPORTANT]
 > **This is a fork used at [FabLab Bergamo](https://github.com/fablab-bergamo)**, not the official UniSolder repository.
 > The original project by sparkybg is at [sparkybg/UniSolder-5.2](https://github.com/sparkybg/UniSolder-5.2) - use it unless you need the changes below.
-> Hardware is unchanged; only the main firmware (`US_Firmware.X`, version 1.3) and the build workflows differ.
+> Hardware, bootloader and sensor firmware are unchanged; the main firmware (`US_Firmware.X`, version 1.3), the Windows PC application and the build workflows differ.
 >
 > **Functional changes from the original firmware:**
 > - **Forced instrument (new `MODEL` menu item)**: `AUTO` (default) keeps resistor-based identification; selecting a profile forces it regardless of the ID resistors. The header shows an inverted `FORCED` badge, since a swapped instrument is no longer detected in this mode. Added because a JBC C245 was intermittently identified as a WELLER WSP80 on our stations, overheating the tip.
@@ -13,7 +13,13 @@ Control almost any low voltage soldering instrument
 > - **FabLab Bergamo logo** on the startup screen.
 > - **Bug fixes**: divide-by-zero in the PID when heater power drops to 0, undefined shift in the sensor maths near 0 °C delta, `TEMP.STEP` displayed wrongly in Fahrenheit, `Gain=0` from the PC app ignored, first profile of the table not selectable in `MODEL`.
 >
-> CI workflows are updated (Node 24 actions, unsigned ClickOnce manifest for the Windows build). The Windows PC application is functionally unchanged.
+> **Changes to the Windows PC application** (also proposed upstream):
+> - **Log file** in `%LOCALAPPDATA%\UniSolder\UniSolder.log`: USB connection, commands and replies, PID changes, firmware update steps, errors.
+> - **PID sliders are disabled when the parameters cannot be read** (no device, or device in bootloader), instead of showing zeros and then writing them to the iron.
+> - **USB robustness**: no lost replies or 100% CPU while waiting for a command, no crash when the device is unplugged or cannot be opened, no corrupted points in the live chart.
+> - **ClickOnce manifests unsigned**, so the application can be published without the original developer's certificate.
+>
+> CI workflows are updated (Node 24 actions, unsigned ClickOnce manifest for the Windows build).
 
 [![Windows Unisolder application](https://github.com/fablab-bergamo/UniSolder-5.2/actions/workflows/build-windows.yaml/badge.svg)](https://github.com/fablab-bergamo/UniSolder-5.2/actions/workflows/build-windows.yaml)
 [![Unisolder firmware](https://github.com/fablab-bergamo/UniSolder-5.2/actions/workflows/build-firmware.yaml/badge.svg)](https://github.com/fablab-bergamo/UniSolder-5.2/actions/workflows/build-firmware.yaml)

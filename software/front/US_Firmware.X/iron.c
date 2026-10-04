@@ -918,8 +918,10 @@ volatile int IronTicks;
 void IronIdentify() {
     static UINT16_VAL OID;
     static UINT8 IDCnt;
+    static UINT16 LockedID = 0x1919; //last accepted ID, a different ID is accepted only after the connector has been seen open
     UINT16_VAL CID;
     UINT16_VAL NewIronID;
+    UINT8 IDBlocked = 0;
     int i;
     UINT16 w;
 
@@ -962,7 +964,21 @@ void IronIdentify() {
 
         if (NewIronID.v[0] >= 0x19)NewIronID.v[0] = NewIronID.v[1];
         if (NewIronID.v[1] >= 0x19)NewIronID.v[1] = NewIronID.v[0];
+
+        // An instrument can't change its ID without being unplugged: a different ID without an open
+        // connector in between is a misreading (bad contact, leakage...), so refuse it instead of loading a wrong profile
+        if (IDCnt > 2 && CID.Val == 0x1919) {
+            LockedID = 0x1919; //connector seen open (instrument unplugged), any new ID can be accepted
+        } else if (NewIronID.Val != 0x1919) {
+            if (LockedID == 0x1919) {
+                LockedID = NewIronID.Val;
+            } else if (NewIronID.Val != LockedID) {
+                NewIronID.Val = 0x1919;
+                IDBlocked = 1;
+            }
+        }
     } else {
+        LockedID = 0x1919; //forced model, start again from scratch when going back to AUTO
         // Override detection with fixed settings
         // FixedInstr value 0 is reserved value for AUTO mode, 1..NB_IRONS maps to Irons[0..NB_IRONS-1]
         if (pars.FixedInstr >= 1 && pars.FixedInstr <= NB_IRONS) {
@@ -993,7 +1009,11 @@ void IronIdentify() {
             PIDInit();
         }
     } else {
-        if (IronID != 0x1919)IronPars = NoIronPars;
+        if (IronID != 0x1919 || IDBlocked)IronPars = NoIronPars;
+        if (IDBlocked) {
+            static const char IDChangedName[24] = "ID CHANGED - REPLUG     ";
+            for (i = 0; i < 24; i++)IronPars.Name[i] = IDChangedName[i];
+        }
         for (i = 2; i--;) {
             PIDVars[i].HInitData = 1;
             PIDVars[i].HP = 0;

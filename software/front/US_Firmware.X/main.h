@@ -20,7 +20,7 @@ extern "C" {
 
 /*This will be visible in version menu*/
 #define VERSION_MAJOR   1
-#define VERSION_MINOR   2
+#define VERSION_MINOR   3
 
 typedef struct __PACKED{
     int HolderPresent:1;

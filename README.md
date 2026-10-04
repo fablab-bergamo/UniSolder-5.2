@@ -17,6 +17,7 @@ Control almost any low voltage soldering instrument
 > - **Log file** in `%LOCALAPPDATA%\UniSolder\UniSolder.log`: USB connection, commands and replies, PID changes, firmware update steps, errors.
 > - **PID sliders are disabled when the parameters cannot be read** (no device, or device in bootloader), instead of showing zeros and then writing them to the iron.
 > - **USB robustness**: no lost replies or 100% CPU while waiting for a command, no crash when the device is unplugged or cannot be opened, no corrupted points in the live chart.
+> - **Display fixes**: DPI-aware layout, no more clipped or overlapping labels and buttons at display scaling other than 125% (e.g. 100%, 110%).
 > - **ClickOnce manifests unsigned**, so the application can be published without the original developer's certificate.
 >
 > CI workflows are updated (Node 24 actions, unsigned ClickOnce manifest for the Windows build).

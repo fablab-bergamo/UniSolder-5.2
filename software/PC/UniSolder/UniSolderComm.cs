@@ -289,7 +289,15 @@ public class UniSolderComm
         return Result;
     }
 
-    public Int32 BlEraseFlash()
+    //64-byte packet minus 13 header bytes. The bootloader skips its address check for records of
+    //512 bytes or more (it could then overwrite itself): records must always stay small.
+    public const int MAX_FLASH_RECORD_DATA = 51;
+
+    /// <summary>
+    /// Erases the application. blStatus is the bootloader result (0 = OK, 0xFF = bad key,
+    /// other = NVM error, -1 = no answer). It is only logged for now, not acted upon.
+    /// </summary>
+    public Int32 BlEraseFlash(out int blStatus)
     {
         byte[] bb = {
             (byte)Commands.BL_ERASE_FLASH,
@@ -298,13 +306,22 @@ public class UniSolderComm
             0x21,
             0x43
         };
+        byte[] resp = new byte[1];
         SSComm.Log.Info("BlEraseFlash");
-        return SendBINCommand(bb, 0, 5, null, 6000);
+        var result = SendBINCommand(bb, 0, 5, resp, 6000);
+        blStatus = result == 0 ? resp[0] : -1;
+        return result;
     }
 
-    public Int32 BlProgramFlash(UInt32 pfAddr, ref byte[] byteBuff, int bbOffset, int bbCount)
+    /// <summary>Programs one record. blStatus: see BlEraseFlash.</summary>
+    public Int32 BlProgramFlash(UInt32 pfAddr, ref byte[] byteBuff, int bbOffset, int bbCount, out int blStatus)
     {
         byte[] bb = new byte[65];
+        blStatus = 0;
+        if (bbCount > MAX_FLASH_RECORD_DATA)
+        {
+            throw new ArgumentOutOfRangeException(nameof(bbCount), bbCount, "Flash record larger than " + MAX_FLASH_RECORD_DATA + " bytes, not sent to the bootloader");
+        }
         if (bbCount > 0)
         {
             bb[0] = (byte)Commands.BL_PROGRAM_FLASH;
@@ -324,7 +341,10 @@ public class UniSolderComm
             {
                 bb[13 + i] = byteBuff[bbOffset + i];
             }
-            return SendBINCommand(bb, 0, 13 + bbCount, null, 1000);
+            byte[] resp = new byte[1];
+            var result = SendBINCommand(bb, 0, 13 + bbCount, resp, 1000);
+            blStatus = result == 0 ? resp[0] : -1;
+            return result;
         }
         else
         {

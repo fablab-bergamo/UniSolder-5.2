@@ -106,7 +106,7 @@ void ProcessIO(){
                     }
                     break;
                 case 3: //Set current iron PID parameters
-                    IronPars.Config[0].SensorConfig.Gain = RXP.IronPars.Gain;
+                    if(RXP.IronPars.Gain) IronPars.Config[0].SensorConfig.Gain = RXP.IronPars.Gain; //Gain is a divisor in GetSensorTemperature
                     IronPars.Config[0].PID_KP = RXP.IronPars.PID_KP;
                     IronPars.Config[0].PID_KI = RXP.IronPars.PID_KI;
                     IronPars.Config[0].PID_DGain = RXP.IronPars.PID_DGain;

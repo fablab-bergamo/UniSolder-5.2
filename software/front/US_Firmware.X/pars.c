@@ -11,6 +11,7 @@ void ParDispStr(int par, int col, int row, int num);
 void ParDispNum(int par, int col, int row, int num);
 void ParDispNumOff(int par, int col, int row, int num);
 void ParDispTemp(int par, int col, int row, int temp);
+void ParDispTempStep(int par, int col, int row, int temp);
 void ParDispCF(int par, int col, int row, int num);
 void ParDispInstr(int par, int col, int row, int num);
 
@@ -45,7 +46,7 @@ const t_ParDef ParDef[] = {
     {"     INPUT ",   0,       0,       5, 0,            0, 0,            0}, //15   
     {" CALIBRATE ",   0,       0,       0, 0,            0, 0,            0}, //16
     {" INST.INFO ",   0,       0,       0, 0,            0, 0,            0}, //17
-    {" TEMP.STEP ",   1,       1,      25, 0,            0, 0,            &ParDispTemp}, //18
+    {" TEMP.STEP ",   1,       1,      25, 0,            0, 0,            &ParDispTempStep}, //18
     {"   MODEL   ",   0,       0,NB_IRONS, 0,            0, 0,            &ParDispInstr}, //19
     {"   VERSION ",   0,       0,       0, 0,            0, 0,            0}, //20
 };
@@ -90,6 +91,16 @@ void ParDispCF(int par, int col, int row, int num){
 void ParDispTemp(int par, int col, int row, int temp){
     if(pars.Deg){
         ParDispNum(par, col, row, ((temp * 461) >> 7) + 32);
+    }
+    else{
+        ParDispNum(par, col, row, temp * 2);
+    }
+    ParDispCF(par, col + 24, row, pars.Deg);
+}
+
+void ParDispTempStep(int par, int col, int row, int temp){
+    if(pars.Deg){
+        ParDispNum(par, col, row, ((temp * 461) + 64) >> 7); //temperature difference: no +32 offset, rounded
     }
     else{
         ParDispNum(par, col, row, temp * 2);

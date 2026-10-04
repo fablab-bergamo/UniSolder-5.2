@@ -50,10 +50,10 @@ typedef struct {
     void (*OLEDDispFunc)(int, int, int, int);
 }t_ParDef;
 
-#define NB_OF_MENU_PARAMS  (sizeof(MenuOrder) / sizeof(MenuOrder[0])
+#define NB_OF_MENU_PARAMS  (sizeof(MenuOrder) / sizeof(MenuOrder[0]))
 
 #ifndef _PARS_C
-extern const char MenuOrder[20]; // Not all parameters are shown in menu
+extern const unsigned char MenuOrder[20]; // Not all parameters are shown in menu
 extern const t_ParDef ParDef[21];
 extern void LoadPars(void);
 extern void SavePars();

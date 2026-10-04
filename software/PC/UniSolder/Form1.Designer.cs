@@ -31,6 +31,9 @@ namespace UniSolder
         private void InitializeComponent()
         {
             this.mainLayout = new System.Windows.Forms.TableLayoutPanel();
+            this.statusStrip1 = new System.Windows.Forms.StatusStrip();
+            this.connStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
+            this.logStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
             this.SsChart2 = new SSControls.SSChart();
             this.panel1 = new System.Windows.Forms.FlowLayoutPanel();
             this.checkBox1 = new System.Windows.Forms.CheckBox();
@@ -64,6 +67,7 @@ namespace UniSolder
             this.DGTrackBar = new System.Windows.Forms.TrackBar();
             this.DGLabel = new System.Windows.Forms.Label();
             this.mainLayout.SuspendLayout();
+            this.statusStrip1.SuspendLayout();
             this.panel1.SuspendLayout();
             this.bottomPanel.SuspendLayout();
             this.buttonsPanel.SuspendLayout();
@@ -296,7 +300,6 @@ namespace UniSolder
             // Button6
             // 
             this.Button6.AutoSize = true;
-            this.Button6.BackColor = System.Drawing.SystemColors.ButtonShadow;
             this.Button6.Margin = new System.Windows.Forms.Padding(0, 0, 0, 4);
             this.Button6.MinimumSize = new System.Drawing.Size(139, 40);
             this.Button6.Name = "Button6";
@@ -304,7 +307,7 @@ namespace UniSolder
             this.Button6.Size = new System.Drawing.Size(139, 40);
             this.Button6.TabIndex = 1;
             this.Button6.Text = "Query device";
-            this.Button6.UseVisualStyleBackColor = false;
+            this.Button6.UseVisualStyleBackColor = true;
             this.Button6.Click += new System.EventHandler(this.Button6_Click);
             // 
             // Button3
@@ -496,13 +499,49 @@ namespace UniSolder
             this.DGLabel.Text = "DGain";
             this.DGLabel.TextAlign = System.Drawing.ContentAlignment.TopCenter;
             // 
+            // statusStrip1
+            // 
+            this.statusStrip1.ImageScalingSize = new System.Drawing.Size(20, 20);
+            this.statusStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.connStatusLabel,
+            this.logStatusLabel});
+            this.statusStrip1.Name = "statusStrip1";
+            this.statusStrip1.ShowItemToolTips = true;
+            //the sizing grip made the Spring label 1 column too wide at non-100% scaling, so it was not placed at all
+            this.statusStrip1.SizingGrip = false;
+            this.statusStrip1.Size = new System.Drawing.Size(1326, 26);
+            this.statusStrip1.TabIndex = 1;
+            // 
+            // connStatusLabel
+            // 
+            this.connStatusLabel.BorderSides = System.Windows.Forms.ToolStripStatusLabelBorderSides.Right;
+            this.connStatusLabel.DoubleClickEnabled = true;
+            this.connStatusLabel.Name = "connStatusLabel";
+            this.connStatusLabel.Size = new System.Drawing.Size(120, 20);
+            this.connStatusLabel.Text = "Not connected";
+            this.connStatusLabel.ToolTipText = "Double-click to open the log file";
+            this.connStatusLabel.DoubleClick += new System.EventHandler(this.StatusBar_DoubleClick);
+            // 
+            // logStatusLabel
+            // 
+            this.logStatusLabel.AutoSize = false;
+            this.logStatusLabel.AutoToolTip = false;
+            this.logStatusLabel.DoubleClickEnabled = true;
+            this.logStatusLabel.Name = "logStatusLabel";
+            //small preferred width: Spring gives it the remaining space
+            this.logStatusLabel.Size = new System.Drawing.Size(100, 20);
+            this.logStatusLabel.Spring = true;
+            this.logStatusLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            this.logStatusLabel.ToolTipText = "Double-click to open the log file";
+            this.logStatusLabel.DoubleClick += new System.EventHandler(this.StatusBar_DoubleClick);
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.BackColor = System.Drawing.SystemColors.ControlDark;
             this.ClientSize = new System.Drawing.Size(1326, 720);
             this.Controls.Add(this.mainLayout);
+            this.Controls.Add(this.statusStrip1);
             this.MinimumSize = new System.Drawing.Size(900, 600);
             this.Name = "Form1";
             this.Text = "UniSolder";
@@ -530,12 +569,18 @@ namespace UniSolder
             this.panel1.PerformLayout();
             this.mainLayout.ResumeLayout(false);
             this.mainLayout.PerformLayout();
+            this.statusStrip1.ResumeLayout(false);
+            this.statusStrip1.PerformLayout();
             this.ResumeLayout(false);
+            this.PerformLayout();
         }
 
         #endregion
 
         private System.Windows.Forms.TableLayoutPanel mainLayout;
+        private System.Windows.Forms.StatusStrip statusStrip1;
+        private System.Windows.Forms.ToolStripStatusLabel connStatusLabel;
+        private System.Windows.Forms.ToolStripStatusLabel logStatusLabel;
         internal SSControls.SSChart SsChart2;
         private System.Windows.Forms.FlowLayoutPanel panel1;
         private System.Windows.Forms.CheckBox checkBox1;

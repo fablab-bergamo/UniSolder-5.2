@@ -15,7 +15,7 @@ jobs:
     # Build the application
     - name: Build with MSBuild
       working-directory: software/PC
-      run: msbuild /p:Configuration=Release /p:Platform="Any CPU" /p:OutputPath=bin/Release /p:DeployOnBuild=true /p:PublishProfile=Properties\PublishProfiles\UnisolderApp.pubxml /p:PublishDir=bin/Release /p:WebPublishMethod=FileSystem /p:DeleteExistingFiles=True /p:publishUrl=bin/Release /p:VisualStudioVersion=16.0 /p:DeployDefaultTarget=WebPublish
+      run: msbuild /p:Configuration=Release /p:Platform="Any CPU" /p:SignManifests=false /p:OutputPath=bin/Release /p:DeployOnBuild=true /p:PublishProfile=Properties\PublishProfiles\UnisolderApp.pubxml /p:PublishDir=bin/Release /p:WebPublishMethod=FileSystem /p:DeleteExistingFiles=True /p:publishUrl=bin/Release /p:VisualStudioVersion=16.0 /p:DeployDefaultTarget=WebPublish
     # Archive the build
     - name: Archive build
       uses: actions/upload-artifact@v4

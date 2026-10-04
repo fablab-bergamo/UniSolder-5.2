@@ -397,7 +397,14 @@ void OLEDTasks(int powerLost){
     }
 
     if(OLEDFlags.f.Header){
-        OLEDPrint68(0, 0, (const char *)&IronPars.Name, 21);
+        if(pars.FixedInstr){ //Model forced from menu: shorten name and show inverted "FORCED" badge
+            OLEDPrint68(0, 0, (const char *)&IronPars.Name, 14);
+            OLEDPrint68(92, 0, "FORCED", 6);
+            OLEDInvert(90, 38, 0, 1);
+        }
+        else{
+            OLEDPrint68(0, 0, (const char *)&IronPars.Name, 21);
+        }
     }
     if(OLEDFlags.f.Footer){
         UINT8 b;

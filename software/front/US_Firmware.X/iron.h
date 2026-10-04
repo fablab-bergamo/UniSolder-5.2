@@ -59,7 +59,8 @@ typedef struct __PACKED {
 #define SENSOR_PTC        2
 #define SENSOR_NONE     255
 
-// Total number of configured irons
+// Total number of configured irons - must be updated when adding/removing entries in Irons[] (iron.c),
+// a compile-time check in iron.c fails the build if it doesn't match
 #define NB_IRONS 14
 
 #ifndef _IRON_C

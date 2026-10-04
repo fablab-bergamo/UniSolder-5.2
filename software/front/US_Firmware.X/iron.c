@@ -86,7 +86,7 @@ const t_IronPars NoIronPars = {
     NULL
 };
 
-const t_IronPars Irons[NB_IRONS] = {
+const t_IronPars Irons[] = {
     {
         0,
         {0x1011},
@@ -910,6 +910,9 @@ const t_IronPars Irons[NB_IRONS] = {
     }
 };
 
+// Compile-time check: NB_IRONS (iron.h) must match the number of entries in Irons[]
+typedef char NB_IRONS_must_match_Irons_count[(sizeof(Irons) / sizeof(Irons[0]) == NB_IRONS) ? 1 : -1];
+
 volatile int IronTicks;
 
 void IronIdentify() {
@@ -934,6 +937,7 @@ void IronIdentify() {
     ID_OUT = 1;
     mcuADCStartManualAVdd();
 
+    NewIronID.Val = 0x1919;
     if (pars.FixedInstr == 0) {
         _delay_us(1000);
         w = mcuADCReadWait(ADCH_ID, 16) >> 4;
@@ -947,7 +951,6 @@ void IronIdentify() {
         for (i = 0; i <= 24; i++)if (w < IDHash[i])break;
         CID.v[1] = i;
 
-        NewIronID.Val = 0x1919;
         if (CID.Val == OID.Val) {
             if (IDCnt < 255)IDCnt++;
             if (IDCnt > 2)NewIronID.Val = CID.Val;
@@ -961,8 +964,8 @@ void IronIdentify() {
         if (NewIronID.v[1] >= 0x19)NewIronID.v[1] = NewIronID.v[0];
     } else {
         // Override detection with fixed settings
-        // FixedInstr value 0 is reserved value for AUTO mode
-        if (pars.FixedInstr > 1 && pars.FixedInstr < NB_IRONS + 1) {
+        // FixedInstr value 0 is reserved value for AUTO mode, 1..NB_IRONS maps to Irons[0..NB_IRONS-1]
+        if (pars.FixedInstr >= 1 && pars.FixedInstr <= NB_IRONS) {
             NewIronID.Val = Irons[pars.FixedInstr - 1].ID.Val;
         }
     }
@@ -1037,7 +1040,7 @@ void IronTasks() {
 const char* IronDesc(UINT8 index) {
     static const char UNKNOWN[24] = "?                       ";
 
-    if (index >= 0 && index < NB_IRONS)
+    if (index < NB_IRONS)
         return Irons[index].Name;
 
     return UNKNOWN;

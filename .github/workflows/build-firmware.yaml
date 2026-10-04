@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Dump current directory
         run: |
           echo ${{ github.workspace }}
@@ -22,7 +22,7 @@ jobs:
           configuration: PIC32_with_bootloader
       # Archive the build output
       - name: Archive build output
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: PIC32_with_bootloader
           path: ${{ github.workspace }}/software/front/US_Firmware.X/dist/PIC32_with_bootloader/production

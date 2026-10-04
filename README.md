@@ -156,6 +156,7 @@ My intention was to build the most universal soldering controller I can think of
 - Open Solution file in /software/PC
 - Build All
 - Run UniSolder project
+- The Windows application writes a log file to `%LOCALAPPDATA%\UniSolder\UniSolder.log` (USB connection, commands sent and received, PID changes, firmware update steps, errors). Attach it when reporting a problem.
 
 ### Using github actions
 

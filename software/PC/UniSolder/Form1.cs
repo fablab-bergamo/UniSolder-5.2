@@ -139,13 +139,28 @@ namespace UniSolder
             }
             else
             {
-                PID = lUniSolder.AppGetPIDParameters();
-                KpTrackBar.Value = PID.KP;
-                KiTrackBar.Value = PID.KI;
-                DGTrackBar.Value = PID.DGain;
-                OVFGTrackBar.Value = PID.OVSGain;
-                GTrackBar.Value = PID.Gain;
+                //PID stays null while the sliders are updated, so ValueChanged does not send anything
+                PID = null;
+                var pid = lUniSolder.Transport.Connected ? lUniSolder.AppGetPIDParameters() : null;
+                bool valid = pid != null;
+                foreach (var tb in new[] { KpTrackBar, KiTrackBar, DGTrackBar, OVFGTrackBar, GTrackBar }) tb.Enabled = valid;
+                if (!valid)
+                {
+                    SSComm.Log.Warn("PID parameters not available (device not connected or in bootloader), sliders disabled.");
+                    return;
+                }
+                SetTrackBar(KpTrackBar, pid.KP);
+                SetTrackBar(KiTrackBar, pid.KI);
+                SetTrackBar(DGTrackBar, pid.DGain);
+                SetTrackBar(OVFGTrackBar, pid.OVSGain);
+                SetTrackBar(GTrackBar, pid.Gain);
+                PID = pid;
             }
+        }
+
+        private static void SetTrackBar(TrackBar tb, int value)
+        {
+            tb.Value = Math.Max(tb.Minimum, Math.Min(tb.Maximum, value));
         }
 
         public delegate void LiveDataReceivedDelegate(object sender, UniSolderComm.LiveDataReceivedEventData e);
@@ -179,7 +194,7 @@ namespace UniSolder
                             SsChart2.Drawings(5).Points[CPoint].Y = b[8] * 0.5F + b[9] * 128.0F;
 
                             //CHRes - Heater resistance x10
-                            SsChart2.Drawings(8).Points[CPoint].Y = b[10] * 1.0F + b[11] * 256.0F;
+                            SsChart2.Drawings(8).Points[CPoint].Y = (short)(b[10] | (b[11] << 8));
 
                             //TAvgP
                             SsChart2.Drawings(9).Points[CPoint].Y = b[12] * 0.5F + b[13] * 128.0F;
@@ -243,59 +258,70 @@ namespace UniSolder
             {
                 Stopwatch sst = new Stopwatch();
                 HexFileManager ss = new HexFileManager();
-                if (ss.LoadHexFile(fd.FileName))// "C:\\Users\\Sparky\\Desktop\\MyProjects\\Electronics\\UniSolder\\software\\front\\US_Firmware.X\\dist\\PIC32_with_bootloader\\production\\US_Firmware.X.production.hex"))
+                SSComm.Log.Info("Firmware update: loading " + fd.FileName);
+                if (!ss.LoadHexFile(fd.FileName))
                 {
-                    if (lUniSolder.Transport.Connected)
+                    SSComm.Log.Error("Firmware update: invalid HEX file (bad checksum or record) " + fd.FileName);
+                }
+                else if (!lUniSolder.Transport.Connected)
+                {
+                    SSComm.Log.Warn("Firmware update: device not connected, aborted");
+                }
+                else
+                {
+                    long totalBytes = 0;
+                    foreach (var r in ss.Records) totalBytes += r.RecDataLen;
+                    SSComm.Log.Info("Firmware update: HEX loaded, " + ss.Records.Count + " records, " + totalBytes + " bytes");
+                    sst.Restart();
+                    byte b = 0;
+                    lUniSolder.DevGetOpMode(ref b);
+                    if (b != 16)
                     {
-                        Debug.Print("Hex File loaded successfully");
-                        sst.Restart();
-                        byte b = 0;
-                        lUniSolder.DevGetOpMode(ref b);
-                        if (b != 16)
+                        SSComm.Log.Info("Firmware update: device in application mode (" + b + "), jumping to bootloader");
+                        lUniSolder.AppJumpToBootloader();
+                        Thread.Sleep(500);
+                        lUniSolder.Transport.Disconnect();
+                        for (int i = 0; i < 20; i++)
                         {
-                            lUniSolder.AppJumpToBootloader();
+                            if (lUniSolder.Transport.Connect()) break;
                             Thread.Sleep(500);
-                            lUniSolder.Transport.Disconnect();
-                            for (int i = 0; i < 20; i++)
-                            {
-                                if (lUniSolder.Transport.Connect()) break;
-                                Thread.Sleep(500);
-                            }
-                            if (!lUniSolder.Transport.Connected) throw new Exception("Could not connect to UniSolder device.");
-                            for (int i = 0; i < 20 && b != 16; i++)
-                            {
-                                lUniSolder.DevGetOpMode(ref b);
-                            }
-                            if (b != 16) throw new Exception("Could not go into bootloader mode.");
                         }
-                        Debug.Print("Erasing Flash...");
-                        lUniSolder.BlEraseFlash();
-                        sst.Stop();
-                        Debug.Print("Erasing completed in " + sst.Elapsed.ToString());
-                        Debug.Print("Programming started...");
-                        sst.Restart();
-                        foreach (var r in ss.Records)
+                        if (!lUniSolder.Transport.Connected) throw new Exception("Could not connect to UniSolder device.");
+                        SSComm.Log.Info("Firmware update: reconnected, waiting for bootloader mode");
+                        for (int i = 0; i < 20 && b != 16; i++)
                         {
-                            var cResult = lUniSolder.BlProgramFlash(r.Address, ref r.Data, 0, (int)r.RecDataLen);
-                            switch (cResult)
-                            {
-                                case 0:
-                                    //Debug.Print(i & "(" & Format(.Address, "X8") & "," & .RecDataLen & ")")
-                                    break;
-                                case -1:
-                                    Debug.Print("Time Out");
-                                    break;
-                                default:
-                                    Debug.Print("Error(" + cResult + ")");
-                                    break;
-                            }
-                            if (cResult != 0) break;
+                            lUniSolder.DevGetOpMode(ref b);
                         }
-                        lUniSolder.BlProgramComplete();
-                        sst.Stop();
-                        Debug.Print("Programming completed in " + sst.Elapsed.ToString());
-                        lUniSolder.BlJumpToApplication();
+                        if (b != 16) throw new Exception("Could not go into bootloader mode.");
                     }
+                    SSComm.Log.Info("Firmware update: erasing flash...");
+                    var eResult = lUniSolder.BlEraseFlash();
+                    if (eResult != 0) SSComm.Log.Error("Firmware update: erase failed, result " + eResult);
+                    sst.Stop();
+                    SSComm.Log.Info("Firmware update: erase completed in " + sst.Elapsed.ToString());
+                    SSComm.Log.Info("Firmware update: programming started...");
+                    sst.Restart();
+                    foreach (var r in ss.Records)
+                    {
+                        var cResult = lUniSolder.BlProgramFlash(r.Address, ref r.Data, 0, (int)r.RecDataLen);
+                        switch (cResult)
+                        {
+                            case 0:
+                                //Debug.Print(i & "(" & Format(.Address, "X8") & "," & .RecDataLen & ")")
+                                break;
+                            case -1:
+                                SSComm.Log.Error("Firmware update: timeout programming record at 0x" + r.Address.ToString("X8") + " (" + r.RecDataLen + " bytes)");
+                                break;
+                            default:
+                                SSComm.Log.Error("Firmware update: error " + cResult + " programming record at 0x" + r.Address.ToString("X8") + " (" + r.RecDataLen + " bytes)");
+                                break;
+                        }
+                        if (cResult != 0) break;
+                    }
+                    lUniSolder.BlProgramComplete();
+                    sst.Stop();
+                    SSComm.Log.Info("Firmware update: programming completed in " + sst.Elapsed.ToString() + ", jumping to application");
+                    lUniSolder.BlJumpToApplication();
                 }
             }
         }
@@ -309,7 +335,7 @@ namespace UniSolder
         private void KpTrackBar_ValueChanged(object sender, EventArgs e)
         {
             KpLabel.Text = "Kp = " + (KpTrackBar.Value / 32767.0).ToString("0.00");
-            if ((PID.KP != KpTrackBar.Value))
+            if (PID != null && (PID.KP != KpTrackBar.Value))
             {
                 PID.KP = (UInt16)KpTrackBar.Value;
                 lUniSolder.AppSetPIDParameters(ref PID);
@@ -319,7 +345,7 @@ namespace UniSolder
         private void KiTrackBar_ValueChanged(object sender, EventArgs e)
         {
             KiLabel.Text = "Ki = " + (KiTrackBar.Value / 32767.0).ToString("0.000");
-            if ((PID.KI != KiTrackBar.Value))
+            if (PID != null && (PID.KI != KiTrackBar.Value))
             {
                 PID.KI = (UInt16)KiTrackBar.Value;
                 lUniSolder.AppSetPIDParameters(ref PID);
@@ -329,7 +355,7 @@ namespace UniSolder
         private void DGTrackBar_ValueChanged(object sender, EventArgs e)
         {
             DGLabel.Text = "DGain = " + DGTrackBar.Value.ToString();
-            if ((PID.DGain != DGTrackBar.Value))
+            if (PID != null && (PID.DGain != DGTrackBar.Value))
             {
                 PID.DGain = (byte)DGTrackBar.Value;
                 lUniSolder.AppSetPIDParameters(ref PID);
@@ -339,7 +365,7 @@ namespace UniSolder
         private void OVFGTrackBar_ValueChanged(object sender, EventArgs e)
         {
             OVFGLabel.Text = "OVFGain = " + OVFGTrackBar.Value.ToString();
-            if ((PID.OVSGain != OVFGTrackBar.Value))
+            if (PID != null && (PID.OVSGain != OVFGTrackBar.Value))
             {
                 PID.OVSGain = (byte)OVFGTrackBar.Value;
                 lUniSolder.AppSetPIDParameters(ref PID);
@@ -349,7 +375,7 @@ namespace UniSolder
         private void GTrackBar_ValueChanged(object sender, EventArgs e)
         {
             GLabel.Text = "Gain = " + GTrackBar.Value.ToString();
-            if ((PID.Gain != GTrackBar.Value))
+            if (PID != null && (PID.Gain != GTrackBar.Value))
             {
                 PID.Gain = (UInt16)GTrackBar.Value;
                 lUniSolder.AppSetPIDParameters(ref PID);

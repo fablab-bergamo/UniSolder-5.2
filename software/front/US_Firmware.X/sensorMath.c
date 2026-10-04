@@ -117,6 +117,9 @@ INT32 GetSensorTemperature(int input, t_SensorConfig * SC){
             if(s <= 0){
                 dw = 0x7FFFFFFF;
             }
+            else if(s >= 32){   //|result| < 0.5; shift by >= 32 is undefined (MIPS uses only low 5 bits)
+                dw = 0;
+            }
             else{
                 dw = PSum.m >> s;
             }
@@ -134,6 +137,9 @@ INT32 GetSensorTemperature(int input, t_SensorConfig * SC){
             s = -((NSum.e - 125) - 32);
             if(s <= 0){
                 dw = 0x80000000;
+            }
+            else if(s >= 32){   //|result| < 0.5; shift by >= 32 is undefined (MIPS uses only low 5 bits)
+                dw = 0;
             }
             else{
                 dw = -(INT32)(NSum.m >> s);

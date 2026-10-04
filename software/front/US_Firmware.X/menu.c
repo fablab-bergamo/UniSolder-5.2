@@ -448,7 +448,7 @@ void OLEDTasks(int powerLost){
     
     if(OLEDFlags.f.Pars){
         int i, par = CPar - CRow;
-        if(par < 0) par += NB_OF_MENU_PARAMS);
+        if(par < 0) par += NB_OF_MENU_PARAMS;
         for(i=0; i < 4; i++){
             int p = MenuOrder[par];
             OLEDPrint816(0, i * 2, ParDef[(UINT8)MenuOrder[(UINT8)par]].Name, 11);
@@ -463,7 +463,7 @@ void OLEDTasks(int powerLost){
                 }
             }
             par++;
-            if(par >= NB_OF_MENU_PARAMS)) par -= NB_OF_MENU_PARAMS);
+            if(par >= NB_OF_MENU_PARAMS) par -= NB_OF_MENU_PARAMS;
         }        
     }
     

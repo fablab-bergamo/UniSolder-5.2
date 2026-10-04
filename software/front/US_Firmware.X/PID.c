@@ -342,8 +342,10 @@ void PID(int PIDStep) {
     pdt >>= 8;
     if(PV->HP){        
         dw = PV->HPAvg >> AVG;
-        pdt *= (INT32)IC->PID_PMax;
-        pdt /= dw;
+        if(dw > 0){ //HPAvg is zeroed on NoHeater while HP keeps its last value
+            pdt *= (INT32)IC->PID_PMax;
+            pdt /= dw;
+        }
         if(mainFlags.TipChange || PV->NoHeater || PV->NoSensor || PV->ShortCircuit){
             PV->HPMax = 0;
             PV->Power = 3;

@@ -18,6 +18,9 @@ namespace SSComm
 
         public static string FilePath { get; private set; }
 
+        /// <summary>Raised after each message (level, message), on the logging thread.</summary>
+        public static event Action<string, string> MessageLogged;
+
         public static void Open(string path)
         {
             lock (Sync)
@@ -79,6 +82,9 @@ namespace SSComm
                 try { writer?.WriteLine(line); }
                 catch (IOException) { }
             }
+            //outside the lock; a failing subscriber must not break logging
+            try { MessageLogged?.Invoke(level.Trim(), msg); }
+            catch (Exception ex) { Debug.WriteLine("Log: MessageLogged handler failed: " + ex.Message); }
         }
     }
 }

@@ -25,6 +25,8 @@ namespace UniSolder
         {
             Disposed += Form1_Disposed;
             InitializeComponent();
+            SSComm.Log.MessageLogged += Log_MessageLogged;
+            logStatusLabel.Text = "Log: " + SSComm.Log.FilePath;
 
             lUniSolder = new UniSolderComm();
             lUniSolder.InstrumentChange += InstrumentChange;
@@ -44,11 +46,65 @@ namespace UniSolder
                     InstrumentChange(null, null);
                 }
             }
+            UpdateConnectionStatus();
         }
 
         private void Form1_Disposed(object sender, EventArgs e)
         {
+            //static event: unsubscribe so the log does not call a disposed form
+            SSComm.Log.MessageLogged -= Log_MessageLogged;
             lUniSolder?.Transport?.Dispose();
+        }
+
+        private void UpdateConnectionStatus()
+        {
+            if (!lUniSolder.Transport.Connected)
+            {
+                connStatusLabel.Text = "Not connected";
+            }
+            else if (PID == null)
+            {
+                //connected but the PID query failed: typically the device is in bootloader mode
+                connStatusLabel.Text = "Connected - no answer (bootloader?)";
+            }
+            else
+            {
+                connStatusLabel.Text = "Connected";
+            }
+        }
+
+        private void Log_MessageLogged(string level, string msg)
+        {
+            //messages come from any thread; before the handle exists InvokeRequired cannot be trusted
+            if (IsDisposed || !IsHandleCreated) return;
+            if (InvokeRequired)
+            {
+                try { BeginInvoke(new Action<string, string>(Log_MessageLogged), level, msg); }
+                catch (InvalidOperationException) { } //form closing
+                return;
+            }
+            var firstLine = msg.Split(new[] { '\r', '\n' }, 2)[0];
+            logStatusLabel.Text = DateTime.Now.ToString("HH:mm:ss") + "  " + (level == "INFO" ? "" : level + ": ") + firstLine;
+            logStatusLabel.ToolTipText = level + ": " + msg + "\n\nDouble-click to open the log file";
+        }
+
+        private void StatusBar_DoubleClick(object sender, EventArgs e)
+        {
+            var path = SSComm.Log.FilePath;
+            if (string.IsNullOrEmpty(path) || !System.IO.File.Exists(path))
+            {
+                MessageBox.Show("The log file is not available.", "UniSolder", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            try
+            {
+                Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+            }
+            catch (System.ComponentModel.Win32Exception)
+            {
+                //no application associated with .log files
+                Process.Start("notepad.exe", "\"" + path + "\"");
+            }
         }
 
         private void Form1_Load(object sender, EventArgs e)
@@ -147,6 +203,7 @@ namespace UniSolder
                 if (!valid)
                 {
                     SSComm.Log.Warn("PID parameters not available (device not connected or in bootloader), sliders disabled.");
+                    UpdateConnectionStatus();
                     return;
                 }
                 SetTrackBar(KpTrackBar, pid.KP);
@@ -155,6 +212,7 @@ namespace UniSolder
                 SetTrackBar(OVFGTrackBar, pid.OVSGain);
                 SetTrackBar(GTrackBar, pid.Gain);
                 PID = pid;
+                UpdateConnectionStatus();
             }
         }
 

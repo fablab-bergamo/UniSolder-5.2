@@ -16,6 +16,7 @@ Control almost any low voltage soldering instrument
 > **Changes to the Windows PC application** (also proposed upstream):
 > - **Log file** in `%LOCALAPPDATA%\UniSolder\UniSolder.log`: USB connection, commands and replies, PID changes, firmware update steps, errors.
 > - **Status bar** with the device connection state and the last log message; double-click it to open the log file.
+> - **Safer firmware update**: the HEX file is checked before anything is sent (wrong build such as `PIC32_Standalone` refused), and on any error the update stops without marking the firmware valid, so the device stays in bootloader mode and the update can be retried.
 > - **PID sliders are disabled when the parameters cannot be read** (no device, or device in bootloader), instead of showing zeros and then writing them to the iron.
 > - **USB robustness**: no lost replies or 100% CPU while waiting for a command, no crash when the device is unplugged or cannot be opened, no corrupted points in the live chart.
 > - **Display fixes**: DPI-aware layout, no more clipped or overlapping labels and buttons at display scaling other than 125% (e.g. 100%, 110%).

@@ -1,8 +1,22 @@
 # UniSolder - The universal soldering controller  ![License CC-BY-4.0](https://img.shields.io/badge/License-CC--BY--4.0-green.svg)
 Control almost any low voltage soldering instrument
 
-[![Windows Unisolder application](https://github.com/PBrunot/UniSolder-5.2/actions/workflows/build-windows.yaml/badge.svg)](https://github.com/PBrunot/UniSolder-5.2/actions/workflows/build-windows.yaml)
-[![Unisolder firmware](https://github.com/PBrunot/UniSolder-5.2/actions/workflows/build-firmware.yaml/badge.svg)](https://github.com/PBrunot/UniSolder-5.2/actions/workflows/build-firmware.yaml)
+> [!IMPORTANT]
+> **This is a fork used at [FabLab Bergamo](https://github.com/fablab-bergamo)**, not the official UniSolder repository.
+> The original project by sparkybg is at [sparkybg/UniSolder-5.2](https://github.com/sparkybg/UniSolder-5.2) - use it unless you need the changes below.
+> Hardware is unchanged; only the main firmware (`US_Firmware.X`, version 1.3) and the build workflows differ.
+>
+> **Functional changes from the original firmware:**
+> - **Forced instrument (new `MODEL` menu item)**: `AUTO` (default) keeps resistor-based identification; selecting a profile forces it regardless of the ID resistors. The header shows an inverted `FORCED` badge, since a swapped instrument is no longer detected in this mode. Added because a JBC C245 was intermittently identified as a WELLER WSP80 on our stations, overheating the tip.
+> - **ID change guard**: once an instrument is identified, a different ID is refused (heaters off, header shows `ID CHANGED - REPLUG`) until the connector reads fully open, i.e. the instrument has really been unplugged. A misread ID (bad contact, leakage) can no longer silently load the wrong profile during re-identification.
+> - **WELLER WSP80 ID resistor changed**: Rid1 (ID to Vout1-) is **330 ohm instead of 120 ohm** (see section 8 below). WSP80 irons wired for the original firmware are not recognised by this fork and vice versa.
+> - **FabLab Bergamo logo** on the startup screen.
+> - **Bug fixes**: divide-by-zero in the PID when heater power drops to 0, undefined shift in the sensor maths near 0 °C delta, `TEMP.STEP` displayed wrongly in Fahrenheit, `Gain=0` from the PC app ignored, first profile of the table not selectable in `MODEL`.
+>
+> CI workflows are updated (Node 24 actions, unsigned ClickOnce manifest for the Windows build). The Windows PC application is functionally unchanged.
+
+[![Windows Unisolder application](https://github.com/fablab-bergamo/UniSolder-5.2/actions/workflows/build-windows.yaml/badge.svg)](https://github.com/fablab-bergamo/UniSolder-5.2/actions/workflows/build-windows.yaml)
+[![Unisolder firmware](https://github.com/fablab-bergamo/UniSolder-5.2/actions/workflows/build-firmware.yaml/badge.svg)](https://github.com/fablab-bergamo/UniSolder-5.2/actions/workflows/build-firmware.yaml)
 
 <img width=500 align="center" src="/img/UniSolder52_small.jpg"/>
 

@@ -6,9 +6,9 @@
  */
 
 #ifndef EEP_H
-#define	EEP_H
+#define EEP_H
 
-#ifdef	__cplusplus
+#ifdef __cplusplus
 extern "C" {
 #endif
 
@@ -18,13 +18,12 @@ extern "C" {
 #define EEP_EXTERN
 #endif
 
-EEP_EXTERN void EEPWrite(UINT16 a, UINT8 * b, UINT16 c);
+EEP_EXTERN void EEPWrite(UINT16 a, UINT8 *b, UINT16 c);
 EEP_EXTERN void EEPWriteImm(UINT16 a, UINT8 b);
-EEP_EXTERN UINT8 EEPRead(UINT16 a, UINT8 * b, UINT16 c);
-    
-#ifdef	__cplusplus
+EEP_EXTERN UINT8 EEPRead(UINT16 a, UINT8 *b, UINT16 c);
+
+#ifdef __cplusplus
 }
 #endif
 
-#endif	/* EEP_H */
-
+#endif /* EEP_H */

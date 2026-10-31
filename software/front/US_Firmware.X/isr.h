@@ -6,9 +6,9 @@
  */
 
 #ifndef ISR_H
-#define	ISR_H
+#define ISR_H
 
-#ifdef	__cplusplus
+#ifdef __cplusplus
 extern "C" {
 #endif
 
@@ -16,9 +16,8 @@ extern "C" {
 #include <GenericTypeDefs.h>
 #include "typedefs.h"
 #include "mcu.h"
-    
-#define CJ_PERIOD 500;  //Period in ticks of measurement of cold junction sensor temperature, if present.    
 
+#define CJ_PERIOD 500; //Period in ticks of measurement of cold junction sensor temperature, if present.
 
 typedef struct {
     int HeaterOn;
@@ -28,14 +27,14 @@ typedef struct {
     unsigned int VTEMP[4];
     unsigned int VIN;
     unsigned int VH;
-}ADCDataS;
+} ADCDataS;
 
 typedef struct {
     SUINT16 CurrentA;
     SUINT16 CurrentB;
     SUINT16 Gain;
     SUINT16 Offset;
-}I2CDataS;
+} I2CDataS;
 
 #ifndef _ISR_C
 #define ISRC_EXTERN extern
@@ -78,30 +77,27 @@ ISRC_EXTERN volatile unsigned int Holder;
 
 ISRC_EXTERN volatile UINT16 EEPAddrR;
 ISRC_EXTERN volatile UINT16 EEPAddrW;
-ISRC_EXTERN volatile UINT8 * EEPDataR;
-ISRC_EXTERN volatile UINT8 * EEPDataW;
+ISRC_EXTERN volatile UINT8 *EEPDataR;
+ISRC_EXTERN volatile UINT8 *EEPDataW;
 ISRC_EXTERN volatile UINT16 EEPCntR;
 ISRC_EXTERN volatile UINT16 EEPCntW;
 
-
-enum I2C_FLAGS{
-    I2C_SET_CPOT=1,
-    I2C_SET_GAINPOT=2,
-    I2C_SET_OFFSET=4,
+enum I2C_FLAGS {
+    I2C_SET_CPOT = 1,
+    I2C_SET_GAINPOT = 2,
+    I2C_SET_OFFSET = 4,
     I2C_EEPWRITE = 8,
     I2C_EEPREAD = 16
 };
 
-enum IntSrc{
-    CompH2L=1,
-    CompL2H=2,
-    DCTimer=3
+enum IntSrc {
+    CompH2L = 1,
+    CompL2H = 2,
+    DCTimer = 3
 };
-
 
 ISRC_EXTERN volatile int I2CStep;
 ISRC_EXTERN volatile unsigned char I2CIdle;
-
 
 ISRC_EXTERN void ISRInit();
 ISRC_EXTERN void ISRStop();
@@ -111,14 +107,12 @@ ISRC_EXTERN void OnPowerLost();
 ISRC_EXTERN void ISRHigh(int src);
 ISRC_EXTERN void I2CISRTasks();
 
-
 #undef ISRC_EXTERN
 
 //#define _I2CStart {I2CStep=0;PIR1bits.SSPIF=1;}
-    
-#ifdef	__cplusplus
+
+#ifdef __cplusplus
 }
 #endif
 
-#endif	/* ISR_H */
-
+#endif /* ISR_H */

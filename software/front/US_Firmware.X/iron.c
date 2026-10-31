@@ -865,6 +865,19 @@ typedef char NB_IRONS_must_match_Irons_count[(sizeof(Irons) / sizeof(Irons[0]) =
 
 volatile int IronTicks;
 
+/**
+ * @brief Pause acquisition, resolve an instrument profile, and restart sensing.
+ *
+ * AUTO mode averages 16 ADC readings for each ID resistor and debounces the
+ * resulting pair across calls. A changed accepted ID is refused until a stable
+ * fully open connector (0x1919) clears the lock. FixedInstr selects a one-based
+ * profile and bypasses resistor identification and that change guard.
+ *
+ * Updates IronID, IronPars, and heater history; unresolved/blocked IDs use the
+ * no-instrument profile. Temporarily owns the ADC, ID pin, and excitation setup.
+ * @pre Foreground only, with acquisition and I2C interrupts running so ISRStop()
+ *      can complete. Not reentrant; debounce/lock state survives ordinary calls.
+ */
 void IronIdentify() {
     static UINT16_VAL OID;
     static UINT8 IDCnt;
@@ -992,11 +1005,23 @@ void IronIdentify() {
     ISRStart();
 }
 
+/**
+ * @brief Select the no-instrument profile and the 0x1919 unresolved ID.
+ * @pre Call before starting acquisition; this does not reset IronIdentify()'s
+ *      function-static debounce and lock history during a running session.
+ */
 void IronInit() {
     IronID = 0x1919;
     IronPars = NoIronPars;
 }
 
+/**
+ * @brief Periodically retry identification for missing or faulty instruments.
+ *
+ * Foreground polling uses every sixteenth observed ISRTicks value and skips
+ * calibration. A recognized profile is rechecked only when an active channel
+ * reports an open heater/sensor. Calls IronIdentify(), which can block.
+ */
 void IronTasks() {
     int i;
     if (IronTicks != ISRTicks) {
@@ -1019,6 +1044,12 @@ void IronTasks() {
     }
 }
 
+/**
+ * @brief Return a borrowed, fixed-width instrument name for menu rendering.
+ * @param[in] index Zero-based profile index, unlike the one-based FixedInstr.
+ * @return Pointer to 24 read-only characters, or the fallback for an invalid
+ *         index. Names need not be NUL-terminated; use bounded display routines.
+ */
 const char *IronDesc(UINT8 index) {
     static const char UNKNOWN[24] = "?                       ";
 

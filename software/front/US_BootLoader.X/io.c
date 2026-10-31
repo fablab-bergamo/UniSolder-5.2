@@ -16,6 +16,10 @@ static UINT8 IO_STATUS;
 
 void ProcessIO();
 
+/**
+ * @brief Initialize recovery HID state and arm the first 64-byte OUT report.
+ * @pre MCU setup complete; call once before polling IOTasks().
+ */
 void IOInit(){
     USBDriverInit();
     IO_STATUS=IO_IDLE;
@@ -23,12 +27,27 @@ void IOInit(){
     USBOutHandle = HIDRxPacket(HID_EP, (BYTE *)&RXP, 64);
 }
 
+/**
+ * @brief Poll USB events and service recovery commands when configured/awake.
+ * @note Foreground only; call regularly to maintain enumeration and HID traffic.
+ */
 void IOTasks(){
     USBDeviceTasks();
     if((USBDeviceState < CONFIGURED_STATE)||(USBSuspendControl==1)) return;
     ProcessIO();   // This is where all the actual bootloader related data transfer/self programming takes place
 }
 
+/**
+ * @brief Execute one received bootloader command when the IN endpoint is free.
+ *
+ * Realigns the one-byte wire command's payload for 32-bit field access, processes
+ * erase/program/CRC/reset requests, and rearms OUT after any response is queued.
+ * Flash-changing commands require the fixed 0x43211234 key; this is an accidental
+ * operation guard, not authentication. Reset commands do not send a reply.
+ * @pre Configured USB, exclusive RXP/TXP ownership, and a well-formed report.
+ * @warning Payload lengths and arbitrary CRC-read addresses are not validated
+ *          here. The host must not treat the key as a memory-access boundary.
+ */
 void ProcessIO(){
     if(IO_STATUS == IO_IDLE){
         if(!HIDRxHandleBusy(USBOutHandle)){

@@ -48,12 +48,22 @@ typedef struct
 	UINT8* Data;
 }T_FLASH_RECORD;
 
+/**
+ * @brief Busy-wait for a core-timer interval without changing interrupt state.
+ * @param[in] a Tick count at CORETIMER_FREQ; unsigned subtraction tolerates wrap.
+ * @pre Core timer running and not reset during the wait.
+ */
 void DelayTicks(UINT32 a){
     UINT32 StartTime;
     StartTime=ReadCoreTimer();
     while((UINT32)(ReadCoreTimer()-StartTime)<a){};
 }
 
+/**
+ * @brief Initialize bootloader clocks/GPIO with heater drive and interrupts off.
+ * @note Establishes core-timer delays and speaker hardware; USB/display setup
+ *       follows only when main() decides to remain in the recovery loop.
+ */
 void mcuInit(void)
 {
     INTDisableInterrupts();
@@ -98,6 +108,11 @@ void mcuInit(void)
     SPKOFF;
 }
 
+/**
+ * @brief Disable USB module/interrupts and clear its pending interrupt status.
+ * @note Preserves the previous CPU interrupt-enable state; outstanding USB
+ *       transfers are abandoned. Called before reset from the recovery service.
+ */
 void mcuDisableUSB(void)
 {
     unsigned int IntState;
@@ -108,6 +123,12 @@ void mcuDisableUSB(void)
     INTRestoreInterrupts(IntState);
 }
 
+/**
+ * @brief Call the application's reset entry at USER_APP_RESET_ADDRESS.
+ * @pre Caller has validated the application and established startup-safe state.
+ * @note Does not validate flash, disable USB, or reset peripherals itself.
+ *       Application startup is expected not to return to this call site.
+ */
 void mcuJumpToApp(void)
 {
 	void (*fptr)(void);
@@ -115,6 +136,14 @@ void mcuJumpToApp(void)
 	fptr();
 }
 
+/**
+ * @brief Erase the configured application-flash and application-vector pages.
+ * @return Status from the last attempted NVMErasePage() call (zero is success).
+ * @note Blocking/destructive; erasing application flash also removes its CRC word.
+ * @warning An application-region failure stops that loop, but the vector loop
+ *          still runs and can overwrite the failure status. A zero return is
+ *          therefore not proof that every requested page was erased successfully.
+ */
 UINT mcuEraseFlash(void){
     UINT result = 1;
     UINT32 i;
@@ -136,6 +165,18 @@ UINT mcuEraseFlash(void){
     return result;
 }
 
+/**
+ * @brief Program a binary address/length/data record using NVM word or row writes.
+ * @param[in] RecordData 32-bit-aligned buffer containing a physical UINT32 address,
+ *                      a UINT32 length (stored internally as UINT16), and data.
+ * @return Last NVM write status, or zero when no write/error was reported. The
+ *         word path silently skips ranges outside its permitted address checks.
+ * @pre Caller validates buffer length, word alignment, and every destination.
+ *      The HID transport must constrain the record to its actual report payload.
+ * @warning The aligned 512-byte row path bypasses the word path's region/config
+ *          guards. This function is not a complete flash-range validator; do not
+ *          expose it to unchecked records or interpret zero as full acceptance.
+ */
 UINT mcuWriteFlashRecord(void * RecordData)
 {
     T_FLASH_RECORD lFR;
@@ -185,6 +226,14 @@ UINT mcuWriteFlashRecord(void * RecordData)
     return Result;
 }
 
+/**
+ * @brief Compute the application CRC and attempt to store its validity word.
+ * @return Computed CRC-16 (seed 1234), widened to UINT32; not a write-status code.
+ * @pre All intended records have been written and verified before this request.
+ * @note CRC excludes the final four-byte validity word and uses uncached reads.
+ *       NVMWriteWord() status is ignored here; the caller cannot infer persistence
+ *       from the returned CRC alone. The separate application IVT is not covered.
+ */
 UINT32 mcuProgramComplete(){
     UINT32 pCRC;
     pCRC = CalculateCRC(1234, (void *)KVA0_TO_KVA1(APP_FLASH_BASE_ADDRESS), (APP_FLASH_END_ADDRESS - APP_FLASH_BASE_ADDRESS) - 3);
@@ -192,6 +241,12 @@ UINT32 mcuProgramComplete(){
     return pCRC;
 }
 
+/**
+ * @brief Compare the application's computed CRC against its stored validity word.
+ * @return 1 on equality, otherwise 0.
+ * @note Uses seed 1234 and excludes the last four flash bytes. Validates only
+ *       that region's CRC; does not authenticate code or validate the separate IVT.
+ */
 UINT mcuValidAppPresent()
 {
     UINT32 pCRC;
@@ -200,6 +255,10 @@ UINT mcuValidAppPresent()
     return 0;
 }
 
+/**
+ * @brief Busy-wait for the bootloader OLED's SPI channel to become idle.
+ * @pre SPI configured; no timeout or peripheral-error recovery is provided.
+ */
 void mcuSPIWait(){
     while(mcuSPIIsBusy());
 }

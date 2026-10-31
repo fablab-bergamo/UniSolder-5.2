@@ -45,7 +45,7 @@ typedef struct {
     int NoHeaterCnt;
     int ShortCircuit;
 
-    UINT32 OffDelay; //Delay between comparator threshold and zero cross point when heater is on, microseconds
+    UINT32 OffDelay; //Scaled comparator timing accumulator; ISRHigh() converts it with >> 4.
 
     int ADCTemp[4];
 
@@ -59,7 +59,7 @@ typedef struct {
 
     int Power; //0=full power, 1=1/2 power, 2=1/4 power, 3=1/8 power
 
-    int CTemp[2];
+    int CTemp[2]; //Temperature samples in half-degrees Celsius, not the target's 2 C steps.
     int CHRes;
 
     int TAvg;
@@ -91,10 +91,10 @@ typedef struct {
 } t_PIDVars;
 
 PID_H_EXTERN volatile unsigned int PIDTicks;
-PID_H_EXTERN volatile int CRTemp;
+PID_H_EXTERN volatile int CRTemp; //Room temperature in half-degrees Celsius.
 PID_H_EXTERN volatile int RTAvg;
-PID_H_EXTERN volatile int CJTemp;
-PID_H_EXTERN volatile int CTTemp;
+PID_H_EXTERN volatile int CJTemp; //Cold-junction temperature in half-degrees Celsius; -546 is invalid.
+PID_H_EXTERN volatile int CTTemp; //Effective target in 2 C steps; menu/holder logic may reduce TTemp.
 
 PID_H_EXTERN volatile t_PIDVars PIDVars[2];
 

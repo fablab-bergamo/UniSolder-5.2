@@ -50,6 +50,15 @@ volatile pars_t pars;
 
 volatile int Enc; //Rotary encoder position
 
+/**
+ * @brief Initialize the station and run its cooperative foreground services.
+ *
+ * Detects AC versus DC, derives phase timing, and initializes peripherals before
+ * starting acquisition. The priority-7 ISR controls heater timing; this loop
+ * services UI, USB, identification, and cold-junction readings. On power loss,
+ * saves settings with I2C interrupts still available, displays status, and resets.
+ * @note Firmware entry point; never returns during normal operation.
+ */
 int main(void) {
     mcuInit1();
     SPKOFF;

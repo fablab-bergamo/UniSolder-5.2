@@ -239,6 +239,9 @@ deployment, especially after compiler or arithmetic changes.
 
 ### How to build Windows tools on Windows
 
+See the [Windows application README](software/PC/README.md) for features,
+prerequisites, command-line builds, USB use, firmware updates, and troubleshooting.
+
 - Install Visual Studio 2022 Community Edition with Desktop .net application workload
 - Open Solution file in /software/PC
 - Build All

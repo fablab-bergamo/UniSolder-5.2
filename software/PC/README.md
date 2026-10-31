@@ -52,8 +52,8 @@ Linux/WSL is not the application build/run environment documented here.
 | `UniSolder/Form1.cs` | Connection/UI behavior, live plotting, and update orchestration. |
 | `UniSolder/UniSolderComm.cs` | Application and bootloader command encoding/decoding. |
 | `UniSolder/HexFileManager.cs` | HEX parsing, record assembly, and layout checks. |
-| `SSComm/` | USB transport, Windows HID interop, and shared logging. |
-| `SSControl/` | Custom chart controls; builds the `SSControls` assembly. |
+| [`SSComm/`](SSComm/README.md) | USB transport, Windows HID interop, and shared logging. |
+| [`SSControl/`](SSControl/README.md) | Custom chart controls; builds the `SSControls` assembly. |
 
 `SSComm.csproj` references the checked-in `SSComm/LibUsbDotNet.dll`; another copy
 exists at this folder's root. There is no NuGet package manifest or separate

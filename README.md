@@ -164,6 +164,9 @@ My intention was to build the most universal soldering controller I can think of
 
 ## Building instructions
 
+The [software component index](software/README.md) links the station firmware,
+bootloader, holder sensor, Windows application, and PC support-library READMEs.
+
 ### Firmware formatting
 
 Use Python 3.10 or newer to install and run the pinned formatter from the repository root:

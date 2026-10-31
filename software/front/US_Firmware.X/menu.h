@@ -6,33 +6,32 @@
  */
 
 #ifndef MENU_H
-#define	MENU_H
+#define MENU_H
 
-#ifdef	__cplusplus
+#ifdef __cplusplus
 extern "C" {
 #endif
 
 /*State machine modes for menu*/
-typedef enum{
-    DEFAULT_MENU,         /*display temperature and do nothing*/
-    SET_TEMPERATURE,      /*set temperature*/
-    RESET_TEMPERATURE,    /*reset temperature*/
-    MENU,                 /*in menu mode*/
-    SET_PARAMS,           /*set parameters*/
-    CALIBRATION,          /*calibration*/
-    INSTRUMENT_INFO,      /*instrument info (debug)*/
-    SET_INPUT_TYPE,       /*input selection*/
-    TIP_CHANGE,           /*tip change*/
-    VERSION_INFO,         /*version information*/
-    STANDBY = 0xFF        /*standby*/
-}T_MENU_MODE;
+typedef enum {
+    DEFAULT_MENU,      /*display temperature and do nothing*/
+    SET_TEMPERATURE,   /*set temperature*/
+    RESET_TEMPERATURE, /*reset temperature*/
+    MENU,              /*in menu mode*/
+    SET_PARAMS,        /*set parameters*/
+    CALIBRATION,       /*calibration*/
+    INSTRUMENT_INFO,   /*instrument info (debug)*/
+    SET_INPUT_TYPE,    /*input selection*/
+    TIP_CHANGE,        /*tip change*/
+    VERSION_INFO,      /*version information*/
+    STANDBY = 0xFF     /*standby*/
+} T_MENU_MODE;
 
 extern void MenuInit();
 extern void MenuTasks(int powerLost);
 
-#ifdef	__cplusplus
+#ifdef __cplusplus
 }
 #endif
 
-#endif	/* MENU_H */
-
+#endif /* MENU_H */

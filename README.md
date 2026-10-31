@@ -161,3 +161,40 @@ My intention was to build the most universal soldering controller I can think of
 
 - Fork the repository
 - Go to Actions, run manually the workflows and download the produced artifacts
+
+### Firmware formatting
+
+Use Python 3.10 or newer to install and run the pinned formatter from the repository root:
+
+```sh
+python -m pip install -r tools/requirements-format.txt
+python -m pre_commit install
+python tools/format_firmware.py --check
+python tools/format_firmware.py --fix
+```
+
+The check reports formatting differences; `--fix` applies them. CI runs the same
+check on pushes and pull requests. The shared `.clang-format` uses four-space
+indentation and attached braces, preserving include order, existing long lines,
+and comment text. Configure your editor to use clang-format 21.1.8 and this file.
+
+The script covers top-level C sources and headers in `software/front/US_Firmware.X/`.
+It excludes vendor USB code, font bitmap headers, `logo.h`, and historical
+`isr_old.c`. Bootloader and sensor firmware are outside this initial scope.
+This is a formatting check, not semantic static analysis, and needs no XC32 installation.
+
+Run `python -m pre_commit install` once in each checkout to enable the Git pre-commit
+hook. Commits touching maintained firmware sources or formatting configuration
+check the main firmware using the same pinned formatter as CI. Formatting errors
+block the commit: run `python tools/format_firmware.py --fix`, review and stage the
+changes, then commit again. The hook does not rewrite or stage files automatically.
+Pre-commit temporarily stashes unstaged tracked changes so partially staged files
+are checked as they will be committed. Its formatter environment is installed on
+first use and reused afterwards. Run `python -m pre_commit run --all-files` to
+check manually.
+
+Commit hooks are local to each clone; committing `.pre-commit-config.yaml` does
+not enable them automatically for other contributors. The firmware formatting
+workflow remains enabled in CI to check contributions from clones without hooks.
+Keep the initial formatting baseline separate from functional firmware changes
+when reviewing history.

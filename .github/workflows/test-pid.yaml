@@ -1,0 +1,35 @@
+name: PID arithmetic
+
+on:
+  push:
+    paths:
+      - 'software/front/US_Firmware.X/**'
+      - 'tests/firmware/**'
+      - 'tools/test_pid.py'
+      - '.github/workflows/test-pid.yaml'
+  pull_request:
+    paths:
+      - 'software/front/US_Firmware.X/**'
+      - 'tests/firmware/**'
+      - 'tools/test_pid.py'
+      - '.github/workflows/test-pid.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  arithmetic:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check native arithmetic with undefined-behavior sanitizer
+        run: |
+          python3 tools/test_pid.py --sanitize --opt 0
+          python3 tools/test_pid.py --sanitize --opt 2
+      - name: Install MIPS arithmetic test tools
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gcc-mipsel-linux-gnu libc6-dev-mipsel-cross qemu-user
+      - name: Check 32-bit MIPS arithmetic under QEMU
+        run: |
+          python3 tools/test_pid.py --cc mipsel-linux-gnu-gcc --runner qemu-mipsel --opt 0
+          python3 tools/test_pid.py --cc mipsel-linux-gnu-gcc --runner qemu-mipsel --opt 2

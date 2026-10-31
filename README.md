@@ -12,6 +12,7 @@ Control almost any low voltage soldering instrument
 > - **WELLER WSP80 ID resistor changed**: Rid1 (ID to Vout1-) is **330 ohm instead of 120 ohm** (see section 8 below). WSP80 irons wired for the original firmware are not recognised by this fork and vice versa.
 > - **FabLab Bergamo logo** on the startup screen.
 > - **Bug fixes**: divide-by-zero in the PID when heater power drops to 0, undefined shift in the sensor maths near 0 °C delta, `TEMP.STEP` displayed wrongly in Fahrenheit, `Gain=0` from the PC app ignored, first profile of the table not selectable in `MODEL`.
+> - **PID arithmetic**: the integral stays nonnegative even with `Kp=0`, preventing overflow into a positive heater request. Signed waveform/error scaling, compensation intermediates, and power normalization have explicit bounds and rounding. USB gain values outside 1..256 are ignored.
 >
 > **Changes to the Windows PC application** (also proposed upstream):
 > - **Log file** in `%LOCALAPPDATA%\UniSolder\UniSolder.log`: USB connection, commands and replies, PID changes, firmware update steps, errors.
@@ -199,6 +200,32 @@ not enable them automatically for other contributors. The firmware formatting
 workflow remains enabled in CI to check contributions from clones without hooks.
 Keep the initial formatting baseline separate from functional firmware changes
 when reviewing history.
+
+### PID arithmetic regression tests
+
+The tests compile the production `PID.c` and profile/PID types, replacing only
+hardware-facing state and sensor conversion. Run with Python 3 and GCC in Linux
+or WSL; XC32 is not required:
+
+```sh
+python3 tools/test_pid.py --sanitize
+python3 tools/test_pid.py --sanitize --opt 0
+```
+
+For 32-bit little-endian MIPS arithmetic, install `gcc-mipsel-linux-gnu`,
+`libc6-dev-mipsel-cross`, and `qemu-user`, then run:
+
+```sh
+python3 tools/test_pid.py --cc mipsel-linux-gnu-gcc --runner qemu-mipsel
+```
+
+CI runs both native sanitizer and MIPS/QEMU checks. Regressions cover zero-Kp
+integral overflow, signed waveform scaling, compensation rounding, coefficient
+boundaries, power normalization, and fault-detection pulses. A nominal replay
+also checks unchanged integer results against the pre-fix MIPS baseline.
+These are arithmetic tests with synthetic readings, not PIC32 peripheral or
+thermal simulation; verify XC32 firmware size and ISR timing on hardware before
+deployment, especially after compiler or arithmetic changes.
 
 ### How to build & load the firmware on Windows
 

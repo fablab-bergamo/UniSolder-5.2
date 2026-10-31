@@ -7,6 +7,37 @@
 #include "main.h"
 #include "sensorMath.h"
 
+/* Duty is an unsigned 24-bit fraction; the stored integral is always nonnegative. */
+#define PID_DUTY_MAX 0x00FFFFFFL
+
+/**
+ * @brief Divide signed fixed-point state by 2^bits, truncating toward zero.
+ * @param[in] value Any INT32 value, including its minimum representable value.
+ * @param[in] bits Shift-equivalent count in [0, 30]; PID callers use at most 17.
+ * @note Unlike the old magnitude/negation macro, division never negates INT32_MIN.
+ *       This intentionally differs from arithmetic right shift for negative odd
+ *       values. Constant power-of-two divisors can be optimized by the compiler.
+ */
+static inline INT32 PIDDivPow2Trunc(INT32 value, unsigned int bits) {
+    return value / ((INT32)1 << bits);
+}
+
+/**
+ * @brief Divide a wide compensation intermediate by 2^bits, rounding downward.
+ * @param[in] value Signed product; widening must occur before multiplication.
+ * @param[in] bits Count in [0, 63]; compensation uses the constants 15 and 11.
+ * @note Preserves XC32's arithmetic-right-shift rounding without relying on a
+ *       signed shift or negating INT64_MIN. For negative value, the complement
+ *       represents -value - 1 without signed overflow; -1 - its shifted value
+ *       supplies floor rounding. This needs no 64-bit division in the ISR.
+ *       Keep both compensation stages: combining them changes quantization.
+ */
+static inline INT64 PIDDivPow2Floor64(INT64 value, unsigned int bits) {
+    if (value >= 0)
+        return (INT64)((UINT64)value >> bits);
+    return -1 - (INT64)(~(UINT64)value >> bits);
+}
+
 /**
  * @brief Reset both duty accumulators and request temperature-filter startup.
  *
@@ -53,8 +84,6 @@ void PIDTasks() {
     ADCData.VCJ = 0;
 }
 
-#define intshr(a, b) ((a < 0) ? (-((-a) >> (b))) : (a >> (b)))
-
 #define assertin(a, b, c) \
     if (b < c) {          \
         if (a < b)        \
@@ -81,9 +110,9 @@ void PIDTasks() {
  * direct GPIO setting. Faults may request sparse heater-detection pulses;
  * tip-change mode suppresses these as well as normal heating.
  * @note Runs in the priority-7 acquisition ISR; do not add blocking operations.
- * @warning Existing signed left shifts in waveform/error scaling can receive
- *          negative operands and are not portable ISO C. Verify arithmetic and
- *          timing against a reference build before changing compiler behavior.
+ * @note Signed scaling uses bounded multiplication and explicit rounding. The
+ *       integral invariant is [0, PID_DUTY_MAX], including when PID_KP is zero.
+ *       Recheck arithmetic bounds and ISR timing when changing ADC/profile limits.
  */
 void PID(int PIDStep) {
     int i, w, AVG;
@@ -116,9 +145,9 @@ void PID(int PIDStep) {
         dw *= 147;
         dw >>= 8;
         dw -= 200;
-        RTAvg -= intshr(RTAvg, ADCAVG);
+        RTAvg -= PIDDivPow2Trunc(RTAvg, ADCAVG);
         RTAvg += dw;
-        CRTemp = intshr(RTAvg, ADCAVG + 1);
+        CRTemp = PIDDivPow2Trunc(RTAvg, ADCAVG + 1);
     }
     /************************************************************************************/
 
@@ -185,9 +214,12 @@ void PID(int PIDStep) {
                     w = PV->WSDelta[0].val;
                     if (i > PV->WSDelta[0].cnt) {
                         PV->WSDelta[0].cnt = i;
-                        PV->WSDelta[0].val = (PV->ADCTemp[1] - PV->ADCTemp[0]) << 1;
+                        /* Two 10-bit samples differ by at most 1023. Multiplying
+                         * by two is exact in INT32 even for a negative difference;
+                         * left-shifting that negative difference is undefined C. */
+                        PV->WSDelta[0].val = (PV->ADCTemp[1] - PV->ADCTemp[0]) * 2;
                     } else if (i == PV->WSDelta[0].cnt) {
-                        PV->WSDelta[0].val = intshr(PV->WSDelta[0].val, 1);
+                        PV->WSDelta[0].val = PIDDivPow2Trunc(PV->WSDelta[0].val, 1);
                         PV->WSDelta[0].val += (PV->ADCTemp[1] - PV->ADCTemp[0]);
                     }
                     w -= PV->WSDelta[0].val;
@@ -196,26 +228,34 @@ void PID(int PIDStep) {
                 }
                 PV->LastOn = PV->ADCTemp[0];
                 PV->OffCnt = 0;
-                PV->WSCorr = intshr(PV->WSDelta[0].val, 1);
+                PV->WSCorr = PIDDivPow2Trunc(PV->WSDelta[0].val, 1);
             } else {
                 if (PV->OffCnt < 8) {
                     if (PV->OffCnt > 0) {
                         if (PV->WSDelta[PV->OffCnt].cnt == 0) {
-                            PV->WSDelta[PV->OffCnt].val = intshr(PV->WSDelta[0].val, 1) - (PV->ADCTemp[0] - PV->LastOn);
+                            PV->WSDelta[PV->OffCnt].val = PIDDivPow2Trunc(PV->WSDelta[0].val, 1) - (PV->ADCTemp[0] - PV->LastOn);
                             PV->WSDelta[PV->OffCnt].cnt = 1;
                         } else {
-                            PV->WSDelta[PV->OffCnt].val = intshr(PV->WSDelta[PV->OffCnt].val, 1);
+                            PV->WSDelta[PV->OffCnt].val = PIDDivPow2Trunc(PV->WSDelta[PV->OffCnt].val, 1);
                         }
-                        PV->WSDelta[PV->OffCnt].val += intshr(PV->WSDelta[0].val, 1) - (PV->ADCTemp[0] - PV->LastOn);
+                        PV->WSDelta[PV->OffCnt].val += PIDDivPow2Trunc(PV->WSDelta[0].val, 1) - (PV->ADCTemp[0] - PV->LastOn);
                         assertin(PV->WSDelta[PV->OffCnt].val, 0, PV->WSDelta[PV->OffCnt - 1].val);
                         if (PV->OffCnt == 1) {
                             //WSMul = multiplier for damping waveshaping
                             if (PV->WSDelta[0].val != 0) {
-                                PV->WSMul = (((INT32)PV->WSDelta[1].val) << 16) / ((INT32)PV->WSDelta[0].val);
-                                if (PV->WSMul < 0)
-                                    PV->WSMul = 0;
-                                if (PV->WSMul > 32768)
-                                    PV->WSMul = 32768;
+                                /* WSDelta[0] remains within +/-2046; assertin()
+                                 * bounds WSDelta[1] between zero and that value.
+                                 * Thus numerator * 65536 fits signed 32 bits.
+                                 * Clamp while signed, before storing in unsigned
+                                 * WSMul; testing WSMul < 0 cannot detect negatives.
+                                 * A zero denominator deliberately retains the last
+                                 * multiplier, as in the original controller. */
+                                INT32 ratio = ((INT32)PV->WSDelta[1].val * 65536L) / (INT32)PV->WSDelta[0].val;
+                                if (ratio < 0)
+                                    ratio = 0;
+                                if (ratio > 32768)
+                                    ratio = 32768;
+                                PV->WSMul = (UINT32)ratio;
                             }
                         }
                     }
@@ -232,11 +272,11 @@ void PID(int PIDStep) {
                                 dw = (dw * PV->WSMul) >> 16;
                             }
                         }
-                        PV->WSCorr = intshr((((INT32)PV->WSDelta[0].val) * dw), 17);
+                        PV->WSCorr = PIDDivPow2Trunc((((INT32)PV->WSDelta[0].val) * dw), 17);
                     } else {
                         //sample waveshaping
                         if (PV->OffCnt < IC->WSLen)
-                            PV->WSCorr = intshr(PV->WSDelta[PV->OffCnt].val, 1);
+                            PV->WSCorr = PIDDivPow2Trunc(PV->WSDelta[PV->OffCnt].val, 1);
                     }
                 }
             }
@@ -245,8 +285,11 @@ void PID(int PIDStep) {
         }
     }
     /************************************************************************************/
-    w = PV->WSCorr *= 1024;
-    w >>= 10;
+    /* Use the correction directly for conversion, retaining its legacy x1024
+     * stored scale. The old multiply/shift round trip relied on signed right
+     * shift when the correction was negative. ADC-derived corrections fit here. */
+    w = PV->WSCorr;
+    PV->WSCorr *= 1024;
     /**** GET AND NORMALISE IRON TEMPRATURE *********************************************/
     w += PV->ADCTemp[0];
     if (w < 0)
@@ -255,7 +298,15 @@ void PID(int PIDStep) {
     //heater resistance compensation for series TC
     //compensation = (HRCompCurrent * 19.6 * Gain * HRAvg)/65536
     //compensation = (((HRCompCurrent * Gain * 20070) / 32767) * HRAvg) / 2048;
-    w -= ((((INT32)IC->SensorConfig.Gain * (INT32)IC->HRCompCurrent * 20070L) >> 15) * (INT32)(PV->HRAvg >> AVG)) >> 11;
+    /* A 16-bit gain can overflow the first 32-bit product even though the final
+     * correction fits. Widen before multiplying, not after, and preserve both
+     * original floor-rounding stages (also for negative compensation current).
+     * With ADC-derived HR <= 32767 and the shipped profiles' |HRCompCurrent| <= 10,
+     * the final correction fits INT32 even for a full-range 16-bit gain. */
+    INT64 compensation = (INT64)IC->SensorConfig.Gain * IC->HRCompCurrent * 20070;
+    compensation = PIDDivPow2Floor64(compensation, 15);
+    compensation *= PV->HRAvg >> AVG;
+    w -= (INT32)PIDDivPow2Floor64(compensation, 11);
 
     dw = GetSensorTemperature(w, &IC->SensorConfig);
 
@@ -307,12 +358,12 @@ void PID(int PIDStep) {
     PV->SBPos &= (1 << AVG) - 1;
 
     //TSlope is current temperature slope, used with DGain to calculate current predicted temperature for PI controller
-    PV->TSlope -= intshr(PV->TSlope, 2);
+    PV->TSlope -= PIDDivPow2Trunc(PV->TSlope, 2);
     PV->TSlope += PV->SlopeBuff[(PV->SBPos - 1) & ((1 << AVG) - 1)];
     PV->TSlope -= PV->SlopeBuff[PV->SBPos];
 
-    dw = ((INT32)IC->PID_DGain) * intshr(PV->TSlope, 2);
-    dw = intshr(dw, AVG + 2);
+    dw = ((INT32)IC->PID_DGain) * PIDDivPow2Trunc(PV->TSlope, 2);
+    dw = PIDDivPow2Trunc(dw, AVG + 2);
 
     //TAvgP is array with current end previous temperature for PI controller, TAvgP=TAvgF + (TSlope * DGain) / 4
     PV->TAvgP[1] = PV->TAvgP[0];
@@ -348,7 +399,7 @@ void PID(int PIDStep) {
             PV->KeepOff = 0;
     }
 
-    //Delta is array with current and previous difference between set and current TAvgP, multiplied by 8
+    //Delta stores the clamped error in half-degree Celsius units, scaled by 32.
     PV->Delta[1] = PV->Delta[0];
     PV->Delta[0] = CTTemp << 2;
     PV->Delta[0] -= PV->TAvgP[0];
@@ -356,24 +407,33 @@ void PID(int PIDStep) {
         PV->Delta[0] = 511;
     if (PV->Delta[0] < -511)
         PV->Delta[0] = -511;
-    PV->Delta[0] <<= 5;
+    /* Error is already clamped to +/-511, so scaling by 32 is representable
+     * (+/-16352). Multiplication also defines the negative-error case in ISO C. */
+    PV->Delta[0] *= 32;
 
+    /* PIDInit() starts I at zero; every path below keeps I in [0, 0x00FFFFFF].
+     * Even a full UINT16 KI gives |Delta * KI| <= 1,071,628,320, so this addition
+     * stays within INT32 before clamping (maximum 1,088,405,535). No 64-bit
+     * integration is needed in the priority-7 ISR under these explicit bounds.
+     * Clamp the lower bound independently of P's sign: with KP == 0, P is zero
+     * even for negative error, so the old P-negative-only clamp allowed I to
+     * decrease until it overflowed and generated a positive heater request. */
     PV->PIDDutyI += PV->Delta[0] * (int)IC->PID_KI;
+    if (PV->PIDDutyI < 0)
+        PV->PIDDutyI = 0;
     if ((PV->PIDDutyP = PV->Delta[0] * (int)IC->PID_KP) >= 0) {
-        dw = 0x00FFFFFF;
+        dw = PID_DUTY_MAX;
         if (PV->PIDDutyP > dw)
             PV->PIDDutyP = dw;
         dw -= PV->PIDDutyP;
         if (PV->PIDDutyI > dw || (PV->DestinationReached == 0 && PV->Delta[0] > (100 << 6)))
             PV->PIDDutyI = dw;
     } else {
-        if (PV->PIDDutyI < 0)
-            PV->PIDDutyI = 0;
         dw = -(PV->Delta[0]) * (int)IC->PID_OVSGain;
         if (dw > 4095)
             dw = 4095;
         dw <<= 12;
-        dw = 0x00FFFFFF - dw;
+        dw = PID_DUTY_MAX - dw;
         if (PV->PIDDutyI > dw)
             PV->PIDDutyI = dw;
     }
@@ -392,8 +452,13 @@ void PID(int PIDStep) {
     if (PV->HP) {
         dw = PV->HPAvg >> AVG;
         if (dw > 0) { //HPAvg is zeroed on NoHeater while HP keeps its last value
-            pdt *= (INT32)IC->PID_PMax;
-            pdt /= dw;
+            /* Rounded duty is at most 65536; multiplying by a UINT16 power
+             * limit fits UINT32 (<= 0xFFFF0000) but may overflow INT32. Divide
+             * while unsigned, then cap before narrowing. The later current
+             * limiter is always below 65535, so this cap does not alter its
+             * result. Preserve the existing zero-average-power fallback. */
+            UINT32 ratedDuty = ((UINT32)pdt * IC->PID_PMax) / (UINT32)dw;
+            pdt = ratedDuty > 65535U ? 65535 : (INT32)ratedDuty;
         }
         if (mainFlags.TipChange || PV->NoHeater || PV->NoSensor || PV->ShortCircuit) {
             PV->HPMax = 0;

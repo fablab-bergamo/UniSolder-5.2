@@ -102,7 +102,15 @@ ClickOnce installer, rather than relying on that old bootstrapper selection.
 
 Run the **Windows Unisolder application** workflow manually from the repository's
 Actions page. Download and extract the **Unisolder-WindowsApp** artifact, which
-contains `UniSolder/bin/Release/` build output. See the
+contains both launch options in one ZIP. Extract the complete archive, then:
+
+- Run `UniSolder.exe` in the root folder for portable use.
+- Open `ClickOnce/UniSolder.application` to install with ClickOnce.
+
+Keep the DLLs and configuration beside the portable executable, and preserve
+all ClickOnce subfolders and `.deploy` files. Both options require the .NET
+Framework 4.8 runtime; the package does not include a prerequisite bootstrapper.
+See the
 [Windows build workflow](../../.github/workflows/build-windows.yaml) for the
 current automation; it is triggered by `workflow_dispatch`, not automatically
 for every pull request.

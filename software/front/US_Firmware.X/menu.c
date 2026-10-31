@@ -180,7 +180,6 @@ void OLEDTasks(int powerLost) {
                     if (EncDiff) {
                         int ctt = TTemp;
                         ctt += EncDiff * pars.TempStep;
-                        ;
                         EncDiff = 0;
                         if (ctt < MINTEMP)
                             ctt = MINTEMP;
@@ -272,7 +271,7 @@ void OLEDTasks(int powerLost) {
                         case 17: //Instrument info
                             CMode = INSTRUMENT_INFO;
                             break;
-                        case 19: //Version info
+                        case 20: //Version info
                             CMode = VERSION_INFO;
                             break;
                         default:
@@ -423,7 +422,13 @@ void OLEDTasks(int powerLost) {
     }
 
     if (OLEDFlags.f.Header) {
-        OLEDPrint68(0, 0, (const char *)&IronPars.Name, 21);
+        if (pars.FixedInstr) { //Model forced from menu: shorten name and show inverted "FORCED" badge
+            OLEDPrint68(0, 0, (const char *)&IronPars.Name, 14);
+            OLEDPrint68(92, 0, "FORCED", 6);
+            OLEDInvert(90, 38, 0, 1);
+        } else {
+            OLEDPrint68(0, 0, (const char *)&IronPars.Name, 21);
+        }
     }
     if (OLEDFlags.f.Footer) {
         UINT8 b;
@@ -479,7 +484,8 @@ void OLEDTasks(int powerLost) {
 
     if (OLEDFlags.f.Pars) {
         int i, par = CPar - CRow;
-        if (par < 0) par += NB_OF_MENU_PARAMS);
+        if (par < 0)
+            par += NB_OF_MENU_PARAMS;
         for (i = 0; i < 4; i++) {
             int p = MenuOrder[par];
             OLEDPrint816(0, i * 2, ParDef[(UINT8)MenuOrder[(UINT8)par]].Name, 11);
@@ -496,7 +502,8 @@ void OLEDTasks(int powerLost) {
                 }
             }
             par++;
-            if (par >= NB_OF_MENU_PARAMS)) par -= NB_OF_MENU_PARAMS);
+            if (par >= NB_OF_MENU_PARAMS)
+                par -= NB_OF_MENU_PARAMS;
         }
     }
 

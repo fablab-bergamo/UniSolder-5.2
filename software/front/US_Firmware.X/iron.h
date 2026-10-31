@@ -15,6 +15,7 @@ extern "C" {
 #include "typedefs.h"
 
 typedef struct __PACKED {
+
     struct __PACKED {
         UINT8 Type;                //sensor type (1: TC, 2: PTC)
         unsigned int HChannel : 1; //Heater Channel
@@ -58,6 +59,10 @@ typedef struct __PACKED {
 #define SENSOR_PTC 2
 #define SENSOR_NONE 255
 
+// Total number of configured irons - must be updated when adding/removing entries in Irons[] (iron.c),
+// a compile-time check in iron.c fails the build if it doesn't match
+#define NB_IRONS 14
+
 #ifndef _IRON_C
 #define IRON_H_EXTERN extern
 #else
@@ -68,6 +73,9 @@ IRON_H_EXTERN UINT16 IronID;
 IRON_H_EXTERN volatile t_IronPars IronPars;
 IRON_H_EXTERN void IronInit();
 IRON_H_EXTERN void IronTasks();
+
+// Description of a given iron by its index
+IRON_H_EXTERN const char *IronDesc(UINT8 index);
 
 #undef IRON_H_EXTERN
 

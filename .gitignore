@@ -16,3 +16,4 @@ software/front/US_Firmware.X/dist/PIC32_with_bootloader/debug/
 software/PC/UniSolder/publish/
 software/front/US_Firmware.X/build/PIC32_NoOptimization/
 software/front/US_Firmware.X/dist/PIC32_NoOptimization/
+software/front/US_Firmware.X/dist/PIC32_with_bootloader/production/

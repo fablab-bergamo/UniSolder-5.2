@@ -12,7 +12,8 @@ INT32 GetSensorTemperature(int input, t_SensorConfig *SC) {
     if (dw > 2047)
         dw = 2047;
 
-    ///******* INPUT MILLIVOLTS CALCULATION ***********************************************/
+    //
+
     //ADC = Vin * 750 * (IC->Gain / 256) * (1024 / 3000mV)
     //mV = (256 * 3000 * ADC) / (750 * 1024 * IC->Gain)) = ADC / IC->Gain
     ExtFloat x1 = {((UINT32)dw) << 20, 0};
@@ -26,7 +27,8 @@ INT32 GetSensorTemperature(int input, t_SensorConfig *SC) {
     }
     ExtFloatDivByUInt(x1, SC->Gain);
 
-    ///******* Resistance calculation if resistive sensor *********************************/
+    //
+
     //R=mV/Current=mV / ((1.225V * IC->Current) / (1600 * 256))
     if (SC->Type == SENSOR_PTC) {
         const ExtFloat rcc = {
@@ -51,7 +53,6 @@ INT32 GetSensorTemperature(int input, t_SensorConfig *SC) {
     }
     // >>> At this point in x1 we have millivolts if thermocouple sensor, or ohms if PTC/NTC sensor. <<<
 
-    /******* TEMPERATURE POLYNOMIAL CALCULATION *****************************************************/
     //T = C0 + C1 * X + c2 * X^2 + C3 * X^3 + ... + C9 * X^9
     {
         ExtFloat PSum = {0, 0};
@@ -117,6 +118,8 @@ INT32 GetSensorTemperature(int input, t_SensorConfig *SC) {
             s = -((PSum.e - 125) - 32);
             if (s <= 0) {
                 dw = 0x7FFFFFFF;
+            } else if (s >= 32) { //|result| < 0.5; shift by >= 32 is undefined (MIPS uses only low 5 bits)
+                dw = 0;
             } else {
                 dw = PSum.m >> s;
             }
@@ -132,6 +135,8 @@ INT32 GetSensorTemperature(int input, t_SensorConfig *SC) {
             s = -((NSum.e - 125) - 32);
             if (s <= 0) {
                 dw = 0x80000000;
+            } else if (s >= 32) { //|result| < 0.5; shift by >= 32 is undefined (MIPS uses only low 5 bits)
+                dw = 0;
             } else {
                 dw = -(INT32)(NSum.m >> s);
             }

@@ -6,9 +6,9 @@
  */
 
 #ifndef IO_H
-#define	IO_H
+#define IO_H
 
-#ifdef	__cplusplus
+#ifdef __cplusplus
 extern "C" {
 #endif
 
@@ -23,16 +23,16 @@ extern "C" {
 
 typedef union {
     UINT8 RAWData[64];
-    struct  __PACKED {
+    struct __PACKED {
         UINT8 Command;
-        union{
+        union {
             UINT8 OpMode;
             UINT8 Data[63];
             UINT16 Data16[31];
             struct __PACKED {
                 unsigned char PacketDataFieldSize;
                 unsigned char BytesPerAddress;
-            }QueryDev;
+            } QueryDev;
             struct __PACKED {
                 UINT16 Gain;
                 UINT16 Offset;
@@ -40,7 +40,7 @@ typedef union {
                 UINT16 PID_KI;
                 UINT16 PID_DGain;
                 UINT16 PID_OVSGain;
-            }IronPars;
+            } IronPars;
             struct __PACKED {
                 UINT16 Ticks;
                 UINT8 CTTemp;
@@ -53,13 +53,10 @@ typedef union {
                 INT16 WSDelta[8] __PACKED;
                 UINT8 DestinationReached;
                 UINT16 Duty;
-            }LiveData;
+            } LiveData;
         };
     };
-}USBPacket;
-
-
-
+} USBPacket;
 
 IOC_EXTERN volatile USBPacket RXP;
 IOC_EXTERN volatile USBPacket TXP;
@@ -69,13 +66,10 @@ IOC_EXTERN void IOTasks();
 
 IOC_EXTERN int BuffEmpty;
 
-
 #undef IOC_EXTERN
 
-
-#ifdef	__cplusplus
+#ifdef __cplusplus
 }
 #endif
 
-#endif	/* IO_H */
-
+#endif /* IO_H */

@@ -1,0 +1,11 @@
+repos:
+  - repo: local
+    hooks:
+      - id: firmware-format
+        name: Check firmware formatting
+        entry: python tools/format_firmware.py --check
+        language: python
+        additional_dependencies: [clang-format==21.1.8]
+        pass_filenames: false
+        files: '^(software/front/US_Firmware\.X/[^/]+\.[ch]|\.clang-format|\.pre-commit-config\.yaml|tools/(format_firmware\.py|requirements-format\.txt))$'
+        exclude: '^software/front/US_Firmware\.X/(fonts\.h|font[0-9][^/]*\.h|logo\.h|isr_old\.c)$'

@@ -6,18 +6,16 @@
  */
 
 #ifndef OLED_H
-#define	OLED_H
+#define OLED_H
 
-
-
-#ifdef	__cplusplus
+#ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef struct __PACKED{
-    int SH1106:1;
-    int InternalChargePump:1;
-}displaysetup_t;
+typedef struct __PACKED {
+    int SH1106 : 1;
+    int InternalChargePump : 1;
+} displaysetup_t;
 
 #ifndef _OLED_C
 #define OLEDC_EXTERN extern
@@ -33,28 +31,26 @@ extern const UINT8 degrees4x16[8];
 #define OLEDC_EXTERN
 #endif
 
-
 OLEDC_EXTERN union {
     UINT32 D[8][32];
     UINT8 B[8][128];
-}OLEDBUFF;
+} OLEDBUFF;
 
 OLEDC_EXTERN void OLEDInit();
 OLEDC_EXTERN void OLEDUpdate();
-OLEDC_EXTERN void OLEDInvert(int col,int colnum, int row, int rownum);
+OLEDC_EXTERN void OLEDInvert(int col, int colnum, int row, int rownum);
 OLEDC_EXTERN void OLEDInvertXY(int x, int dx, int y, int dy);
 OLEDC_EXTERN void OLEDFill(int col, int colnum, int row, int rownum, UINT8 b);
 OLEDC_EXTERN void OLEDFillXY(int x, int dx, int y, int dy, int b);
-OLEDC_EXTERN void OLEDWrite(int col, int colnum, int row, void * buf, int num);
-OLEDC_EXTERN void OLEDWriteXY(int x, int colnum, int y, void * buf, int num);
+OLEDC_EXTERN void OLEDWrite(int col, int colnum, int row, void *buf, int num);
+OLEDC_EXTERN void OLEDWriteXY(int x, int colnum, int y, void *buf, int num);
 OLEDC_EXTERN void OLEDPrintNum3248(int col, int row, int num);
 OLEDC_EXTERN void OLEDPrintCF1648(int col, int row, int CF);
-OLEDC_EXTERN void OLEDPrintNum(int col, int row, int dec, int num, void* font, int startChar, int width, int height, int blank );
-OLEDC_EXTERN void OLEDPrintNumXY(int x, int y, int dec, int num, void* font, int startChar, int width, int height, int blank );
-OLEDC_EXTERN void OLEDPrintHex(int col, int row, int dec, unsigned int num, void* font, int startChar, int width, int height, int blank );
-OLEDC_EXTERN void OLEDPrint(int col, int row, const char * s, int num, void * font, int startChar, int width, int height, int blank);
-OLEDC_EXTERN void OLEDPrintXY(int col, int row, const char * s, int num, void * font, int startChar, int width, int height, int blank);
-
+OLEDC_EXTERN void OLEDPrintNum(int col, int row, int dec, int num, void *font, int startChar, int width, int height, int blank);
+OLEDC_EXTERN void OLEDPrintNumXY(int x, int y, int dec, int num, void *font, int startChar, int width, int height, int blank);
+OLEDC_EXTERN void OLEDPrintHex(int col, int row, int dec, unsigned int num, void *font, int startChar, int width, int height, int blank);
+OLEDC_EXTERN void OLEDPrint(int col, int row, const char *s, int num, void *font, int startChar, int width, int height, int blank);
+OLEDC_EXTERN void OLEDPrintXY(int col, int row, const char *s, int num, void *font, int startChar, int width, int height, int blank);
 
 #define OLEDPrint68(col, row, s, num) OLEDPrint(col, row, s, num, font6x8, 32, 5, 1, 1)
 #define OLEDPrintXY68(x, y, s, num) OLEDPrintXY(x, y, s, num, font6x8, 32, 5, 1, 1)
@@ -74,11 +70,8 @@ OLEDC_EXTERN void OLEDPrintXY(int col, int row, const char * s, int num, void * 
 
 #undef OLEDC_EXTERN
 
-
-
-#ifdef	__cplusplus
+#ifdef __cplusplus
 }
 #endif
 
-#endif	/* OLED_H */
-
+#endif /* OLED_H */

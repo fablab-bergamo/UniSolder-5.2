@@ -6,34 +6,34 @@
  */
 
 #ifndef __TYPEDEFS_H__
-#define	__TYPEDEFS_H__
+#define __TYPEDEFS_H__
 
-#ifdef	__cplusplus
+#ifdef __cplusplus
 extern "C" {
 #endif
 
 #include <GenericTypeDefs.h>
 
 #if !defined(__PACKED)
-    #define __PACKED __attribute__((__packed__))
+#define __PACKED __attribute__((__packed__))
 #endif
 
-typedef union{
+typedef union {
     int i;
     unsigned int ui;
-}SUINT;
+} SUINT;
 
-typedef union{
+typedef union {
     INT8 i8;
     UINT8 ui8;
-}SUINT8;
+} SUINT8;
 
-typedef union{
+typedef union {
     INT16 i16;
     UINT16 ui16;
     INT8 i8[2];
     UINT8 ui8[2];
-}SUINT16;
+} SUINT16;
 
 typedef union {
     INT32 i32;
@@ -42,19 +42,17 @@ typedef union {
     UINT16 ui16[2] __PACKED;
     INT8 i8[4];
     UINT8 ui8[4];
-    struct __PACKED
-    {
+    struct __PACKED {
         UINT8 z1;
         INT16 mi16;
         UINT8 z2;
     };
-    struct __PACKED
-    {
+    struct __PACKED {
         UINT8 z3;
         INT16 mui16;
         UINT8 z4;
     };
-}SUINT32;
+} SUINT32;
 
 typedef union {
     INT64 i64;
@@ -65,12 +63,10 @@ typedef union {
     UINT16 ui16[4] __PACKED;
     INT8 i8[8];
     UINT8 ui8[8];
-}SUINT64;
+} SUINT64;
 
-
-#ifdef	__cplusplus
+#ifdef __cplusplus
 }
 #endif
 
-
-#endif	/* __TYPEDEFS_H__ */
+#endif /* __TYPEDEFS_H__ */

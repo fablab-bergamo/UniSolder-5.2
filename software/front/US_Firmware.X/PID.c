@@ -7,6 +7,14 @@
 #include "main.h"
 #include "sensorMath.h"
 
+/**
+ * @brief Reset both duty accumulators and request temperature-filter startup.
+ *
+ * Marks the cold-junction reading invalid (-546, in half-degree Celsius units)
+ * and starts each channel in the lowest power band. Other measurement and filter
+ * fields are initialized later by the acquisition path and PID().
+ * @pre Run before acquisition starts, or while ISRStop() has quiesced it.
+ */
 void PIDInit() {
     int i;
     CJTemp = -273 * 2;
@@ -22,6 +30,14 @@ void PIDInit() {
     }
 };
 
+/**
+ * @brief Consume the latest cold-junction ADC sample from the foreground loop.
+ *
+ * Updates CJTemp in half-degree Celsius units for valid samples below 100 C.
+ * Missing profiles invalidate CJTemp; rejected samples retain its previous value.
+ * Clears ADCData.VCJ after inspection. This shares a mailbox with the ISR and
+ * does not guarantee that every produced sample is consumed.
+ */
 void PIDTasks() {
     t_SensorConfig *CJC = (t_SensorConfig *)IronPars.ColdJunctionSensorConfig;
     if (CJC && ADCData.VCJ && ADCData.VCJ < 1023) {
@@ -52,6 +68,23 @@ void PIDTasks() {
             a = b;        \
     }
 
+/**
+ * @brief Process one acquired sensor sample and calculate the next heater duty.
+ * @param[in] PIDStep Acquisition channel index, 0 or 1. Single-channel profiles
+ *                    use PIDVars[0] for either step; step 1 also updates CRTemp.
+ * @pre Called by ISRHigh() after the paired temperature readings are available.
+ *
+ * Applies heater-resistance compensation, waveform correction, temperature
+ * filtering, PI control with slope prediction, and power/current limiting.
+ * CTemp and ambient readings use half-degrees Celsius; CTTemp uses 2 C steps.
+ * PIDDuty uses a 24-bit fractional accumulator consumed by ISRHigh(), not a
+ * direct GPIO setting. Faults may request sparse heater-detection pulses;
+ * tip-change mode suppresses these as well as normal heating.
+ * @note Runs in the priority-7 acquisition ISR; do not add blocking operations.
+ * @warning Existing signed left shifts in waveform/error scaling can receive
+ *          negative operands and are not portable ISO C. Verify arithmetic and
+ *          timing against a reference build before changing compiler behavior.
+ */
 void PID(int PIDStep) {
     int i, w, AVG;
     INT32 dw, pdt;

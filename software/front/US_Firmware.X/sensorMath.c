@@ -5,6 +5,20 @@
 #include "PID.h"
 #include "main.h"
 
+/**
+ * @brief Convert a corrected ADC reading using the selected sensor polynomial.
+ * @param[in] input ADC-domain value, before the profile offset is added.
+ * @param[in] SC Non-NULL sensor profile with nonzero Gain; read but not modified.
+ * @return Temperature in half-degrees Celsius. The polynomial result is clamped
+ *         to [-546, 2000] before thermocouple cold-junction compensation is added,
+ *         so the final return value is not necessarily within that range.
+ *
+ * Saturates the offset-adjusted input to [0, 2047]. Resistive profiles account
+ * for excitation current and range; a zero current setting is treated as one.
+ * Thermocouples use CJTemp when it is at least -5 C, otherwise CRTemp.
+ * @note Uses the target-dependent SFLOAT layout and ExtFloat arithmetic; this
+ *       is not a portable IEEE floating-point implementation or an error API.
+ */
 INT32 GetSensorTemperature(int input, t_SensorConfig *SC) {
     INT32 dw = input + SC->Offset;
     if (dw < 0)

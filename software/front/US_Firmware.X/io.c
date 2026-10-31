@@ -26,6 +26,11 @@ static unsigned int BuffPos;
 
 void ProcessIO();
 
+/**
+ * @brief Initialize the application HID driver and command-processing state.
+ * @pre Called once during startup before the foreground begins IOTasks().
+ * @note Owns RXP/TXP and their USB transfer handles; not reentrant.
+ */
 void IOInit() {
     IO_TICKS = ISRTicks;
     IO_BUSY = 1;
@@ -33,6 +38,10 @@ void IOInit() {
     RXP.Command = 0;
 }
 
+/**
+ * @brief Poll USB device events and process HID traffic when configured/awake.
+ * @note Foreground service; call regularly even when no command is expected.
+ */
 void IOTasks() {
     USBDeviceTasks();
     if ((USBDeviceState < CONFIGURED_STATE) || (USBSuspendControl == 1))
@@ -40,6 +49,15 @@ void IOTasks() {
     ProcessIO(); // This is where all the actual bootloader related data transfer/self programming takes place
 }
 
+/**
+ * @brief Multiplex application HID commands, ID notifications, and live samples.
+ *
+ * Sends 64-byte reports only when the IN handle is free and rearms OUT after
+ * consuming a command. Command 3 updates channel-0 tuning in RAM (zero Gain is
+ * ignored); 0x81 requests a bootloader reset. Live reports read ISR-owned fields
+ * individually and are not an atomic snapshot of a single acquisition cycle.
+ * @pre USB must be configured and awake; called by IOTasks() in foreground.
+ */
 void ProcessIO() {
     static UINT16 _IronID = 0;
 

@@ -20,8 +20,16 @@
 static UINT32_VAL pwd;
 
 
-/*
- * 
+/**
+ * @brief Run the PIC12F615 holder sensor's carrier and challenge/echo loop.
+ *
+ * Configures Timer2/CCP carrier PWM, transmits the four-byte "WaKe" pattern
+ * least-significant bit first, and shifts RX samples into the same 32-bit word.
+ * Uses a 6 ms leader, two 600 us phases per bit, and a 100 ms inter-frame delay.
+ * A matching echo asserts SLEEPOUT immediately; eight consecutive nonmatching
+ * frames deassert it. The first seven misses preserve the previous output.
+ * @note Standalone firmware entry point; blocking timing assumes the configured
+ *       8 MHz oscillator and never returns. No interrupts service this protocol.
  */
 void main(void) {
     UINT32_VAL RXTX;

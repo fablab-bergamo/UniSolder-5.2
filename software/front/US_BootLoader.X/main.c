@@ -15,6 +15,16 @@
 
 void displayTasts(void);
 
+/**
+ * @brief Select a validated application or enter the polled USB recovery loop.
+ *
+ * Starts the application only if its stored CRC matches and NVMDATA does not
+ * contain the application's bootloader-request magic. A pressed B2 requires
+ * release before the core-timer threshold to remain here; holding it through
+ * the threshold still launches a valid application. Clears the request magic
+ * before initializing the recovery display and HID command service.
+ * @note Firmware entry point; normal execution never returns.
+ */
 int main(void){
     
     mcuInit();
@@ -42,6 +52,11 @@ int main(void){
     }
 }
 
+/**
+ * @brief Animate two OLED pages once per 4096 recovery-loop calls.
+ * @note Cadence depends on polling/USB workload, not elapsed time. Modifies
+ *       OLEDBUFF pages 3/4 and sends the full framebuffer; foreground only.
+ */
 void displayTasts(void){
     volatile static int CT;
     volatile static int CTT;

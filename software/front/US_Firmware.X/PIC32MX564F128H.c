@@ -41,6 +41,14 @@
 #include "isr.h"
 #include "OLED.h"
 
+/**
+ * @brief Probe the revision-detect/OLED D-C wiring and update BoardVersion.
+ *
+ * Defaults to HW 5.2 and recognizes 5.2C only when both driven test patterns
+ * match. Changes pin directions, pull-ups, and latches; a failed probe returns
+ * early with that probe stage's pin configuration still in effect.
+ * @pre Startup only, before OLEDInit() establishes normal display pin ownership.
+ */
 void GetBoardVersion() {
     BoardVersion = BOARD_HW_5_2;
     OLED_DC_3S = 1;
@@ -69,6 +77,12 @@ void GetBoardVersion() {
     BoardVersion = BOARD_HW_5_2C;
 }
 
+/**
+ * @brief Perform early MCU setup with interrupts disabled and heater drive off.
+ *
+ * Initializes the core timer, flash wait states, GPIO, and board revision probe;
+ * stops ADC/SPI interrupt activity. Must precede OLEDInit() and later init stages.
+ */
 void mcuInit1() {
     INTDisableInterrupts();
     OpenCoreTimer(0xFFFFFFFF);
@@ -119,6 +133,12 @@ void mcuInit1() {
         TRISBbits.TRISB12 = 1;
 }
 
+/**
+ * @brief Configure speaker timing, DMA, I2C4, comparator, and the supply timer.
+ * @pre mcuInit1() and OLEDInit() must have completed; interrupts remain disabled.
+ * @note Uses OLED progress output and blocking delays. I2C bus recovery can wait
+ *       indefinitely if SDA remains low. Timer1 initially spans 0xFFFF counts.
+ */
 void mcuInit2() {
     OLEDPrintNum68(0, 0, 2, 10);
     OLEDUpdate();
@@ -170,6 +190,11 @@ void mcuInit2() {
     OLEDUpdate();
 }
 
+/**
+ * @brief Reconfigure Timer1 with the supply-dependent period T_PER.
+ * @pre main() must have measured the supply and derived T_PER after mcuInit2().
+ * @note Does not enable Timer1 interrupts; mcuInit4() completes that setup.
+ */
 void mcuInit3() {
     CloseTimer1();
     OpenTimer1(T1_ON | T1_IDLE_STOP | T1_TMWDIS_OFF | T1_GATE_OFF | T1_PS_1_256 | T1_SYNC_EXT_OFF | T1_SOURCE_INT, T_PER);
@@ -177,6 +202,12 @@ void mcuInit3() {
     OLEDUpdate();
 }
 
+/**
+ * @brief Enable prioritized acquisition, I2C, and encoder interrupts.
+ * @pre Timing, ISR state, PID state, and foreground modules must be initialized.
+ * @note Configures timer/capture sources and enables multivectored interrupts.
+ *       Acquisition uses priority 7/shadow registers; I2C uses 6, encoder uses 4.
+ */
 void mcuInit4() {
     CMP2ConfigInt(CMP_INT_ENABLE | CMP_INT_PRIOR_7 | CMP_INT_SUB_PRI_3);
     ConfigIntADC10(ADC_INT_ON | ADC_INT_PRI_7 | ADC_INT_SUB_PRI_3);
@@ -212,6 +243,11 @@ void mcuInit4() {
     OLEDUpdate();
 }
 
+/**
+ * @brief Compute floor(sqrt(n)) using a 16-bit candidate and integer arithmetic.
+ * @param[in] n Unsigned 32-bit radicand.
+ * @return Integer square root in [0, 65535]. No peripherals or shared state used.
+ */
 unsigned int mcuSqrt(register unsigned int n) {
     register unsigned int r, x;
     r = 0;
@@ -223,6 +259,13 @@ unsigned int mcuSqrt(register unsigned int n) {
     return r;
 }
 
+/**
+ * @brief Busy-wait for a core-timer interval, leaving interrupt state unchanged.
+ * @param[in] a Interval in CORETIMER_FREQ ticks, not peripheral-timer ticks.
+ * @pre Core timer must be running and must not be reset during this wait.
+ * @note Unsigned subtraction tolerates wrap; execution/interrupt latency may
+ *       extend the delay. This blocks the caller and provides no scheduling.
+ */
 void DelayTicks(UINT32 a) {
     UINT32 StartTime;
     StartTime = ReadCoreTimer();
@@ -230,16 +273,31 @@ void DelayTicks(UINT32 a) {
     };
 }
 
+/**
+ * @brief Store the bootloader-request magic in NVMDATA and issue a soft reset.
+ * @note Relies on the companion bootloader recognizing 0x6193471A after reset;
+ *       does not persist settings or explicitly quiesce the running peripherals.
+ */
 void mcuJumpToBootLoader() {
     NVMDATA = 0x6193471A;
     SoftReset();
 }
 
+/**
+ * @brief Busy-wait until the SPI3 channel reports idle; no timeout is enforced.
+ * @pre SPI must be configured; callers serialize display command/data changes.
+ */
 void mcuSPIWait() {
     while (mcuSPIIsBusy())
         ;
 }
 
+/**
+ * @brief Attempt I2C bus recovery by clocking SCL until SDA is released.
+ * @pre I2C4 disabled; foreground/startup owns the SDA/SCL GPIO configuration.
+ * @note Uses GPIO direction changes and delays, then generates a release
+ *       sequence. Has no retry limit if a device holds SDA low indefinitely.
+ */
 void mcuI2CReset() {
     SDALAT = 0;
     SCLLAT = 0;
@@ -258,22 +316,33 @@ void mcuI2CReset() {
     _delay_us(100);
 }
 
+/** @brief Zero the Timer1 supply/fallback timer and clear its interrupt flag. */
 void mcuDCTimerReset() {
     WriteTimer1(0);
     mT1ClearIntFlag();
 }
 
+/**
+ * @brief Configure Timer2 as a stopped, priority-7 acquisition step timer.
+ * @note Uses PER_FREQ/256 counts per second; mcuStartISRTimer() arms each step.
+ */
 void mcuInitISRTimer() {
     OpenTimer2(T2_OFF | T2_IDLE_STOP | T2_GATE_OFF | T2_PS_1_256 | T2_32BIT_MODE_OFF | T2_SOURCE_INT, 0xFFFF);
     ConfigIntTimer2(T2_INT_ON | T2_INT_PRIOR_7 | T2_INT_SUB_PRIOR_3);
 }
 
+/**
+ * @brief Restart Timer2 for the next acquisition step.
+ * @param[in] per Hardware period count at PER_FREQ/256, fitting the 16-bit timer.
+ * @pre mcuInitISRTimer() has run; use mcuStartISRTimer_us() for microsecond input.
+ */
 void mcuStartISRTimer(unsigned int per) {
     WriteTimer2(0);
     WritePeriod2(per);
     T2CONbits.ON = 1;
 }
 
+/** @brief Stop and zero Timer2, discarding its pending interrupt flag. */
 void mcuStopISRTimer() {
     WriteTimer2(0);
     T2CONbits.ON = 0;
@@ -282,6 +351,14 @@ void mcuStopISRTimer() {
 
 int ADCAuto = 0;
 
+/**
+ * @brief Stop ADC/DMA acquisition and preserve the first automatic sample count.
+ *
+ * Captures DMA0's word position in VTIBuffCnt when needed, aborts both DMA
+ * channels, drains ADC buffers, disables the ADC interrupt, and clears ADCAuto.
+ * @note Acquisition code must own the ADC when calling; this changes shared
+ *       DMA/ADC state and does not preserve the previous conversion mode.
+ */
 void mcuADCStop() {
     if (ADCAuto && !VTIBuffCnt)
         VTIBuffCnt = DmaChnGetDstPnt(DMA_CHANNEL0) >> 2;
@@ -311,6 +388,11 @@ void mcuADCStop() {
     ADCAuto = 0;
 }
 
+/**
+ * @brief Stop prior sampling and configure manual conversions with external Vref.
+ * @note Enables ADC interrupts; mcuADCRead() starts a conversion sequence later.
+ *       Discards the previous ADC/DMA mode through mcuADCStop().
+ */
 void mcuADCStartManualVRef() {
     mcuADCStop();
     OpenADC10(
@@ -323,6 +405,11 @@ void mcuADCStartManualVRef() {
     mAD1IntEnable(1);
     ADCAuto = 0;
 }
+/**
+ * @brief Configure manual conversions using AVdd as the positive reference.
+ * @note Used for resistor-ID measurement while the acquisition ISR is stopped.
+ *       Enables ADC interrupts; mcuADCReadWait() temporarily masks them as needed.
+ */
 void mcuADCStartManualAVdd() {
     mcuADCStop();
     OpenADC10(
@@ -336,6 +423,13 @@ void mcuADCStartManualAVdd() {
     ADCAuto = 0;
 }
 
+/**
+ * @brief Start external-reference scanning into voltage and temperature/current DMA buffers.
+ * @param[in] temp Nonzero pairs VIN with TEMP; zero pairs VIN with VSHUNT.
+ * @note Stops the previous acquisition mode. DMA0 fills VBuff and DMA1 fills
+ *       TIBuff; their positions/counts are interpreted by ISRHigh(). The caller
+ *       must stop acquisition before consuming buffers that must remain stable.
+ */
 void mcuADCStartAutoVRef(int temp) {
     mcuADCStop();
 
@@ -362,6 +456,13 @@ void mcuADCStartAutoVRef(int temp) {
     ADCAuto = 1;
 }
 
+/**
+ * @brief Start a finite manual sampling sequence without waiting for completion.
+ * @param[in] ADCCH PLIB channel-selection value, such as ADCH_TEMP.
+ * @param[in] num Number of samples in [1, 16], matching the ADC buffer capacity.
+ * @pre Manual ADC mode configured and no other code owns an active conversion.
+ * @note ADCISR() sums the samples into mcuADCRES and advances acquisition.
+ */
 void mcuADCRead(int ADCCH, int num) {
     SetChanADC10(ADCCH);
     AD1CON2bits.SMPI = num - 1;
@@ -370,6 +471,15 @@ void mcuADCRead(int ADCCH, int num) {
     AcquireADC10();
 }
 
+/**
+ * @brief Start manual conversions and return their unaveraged sum.
+ * @param[in] ADCCH PLIB channel-selection value.
+ * @param[in] num Sample count in [1, 16]; callers divide to obtain an average.
+ * @return Sum of the requested 10-bit samples.
+ * @pre Manual mode configured and normal acquisition stopped; not reentrant.
+ * @note Temporarily masks only the ADC interrupt and restores its enable bit.
+ *       Waits for completion without a timeout.
+ */
 int mcuADCReadWait(int ADCCH, int num) {
     int ADCInt, i;
     ADCInt = mAD1GetIntEnable();
@@ -387,6 +497,12 @@ int mcuADCReadWait(int ADCCH, int num) {
 }
 
 volatile UINT32 _MRT_LastCoreTimer;
+/**
+ * @brief Measure whole microseconds since this shared stopwatch's previous call.
+ * @return Unsigned core-timer delta divided by CORETIMER_FREQ/1000000, as int.
+ * @note First call measures from the initial zero timestamp. Loses fractional
+ *       microseconds and cannot distinguish multiple timer wraps. Not reentrant.
+ */
 int mcuReadTime_us() { //returns time in us from last call
     UINT32 dw = _MRT_LastCoreTimer;
     _MRT_LastCoreTimer = ReadCoreTimer();
@@ -396,6 +512,12 @@ int mcuReadTime_us() { //returns time in us from last call
 }
 
 static UINT32 H2LTime = 0;
+/**
+ * @brief Capture supply-comparator edges and dispatch the acquisition cycle.
+ * @note Priority 7 with shadow registers. Falling edges reset Timer1 and record
+ *       the heater state; rising edges update raw comparator-low timing values.
+ *       Disables comparator interrupts until the acquisition sequence rearms them.
+ */
 void __ISR(_COMPARATOR_2_VECTOR, IPL7SRS) ComparatorISR(void) {
     static int oh;
     UINT32 ccon = CM2CON;
@@ -419,6 +541,10 @@ void __ISR(_COMPARATOR_2_VECTOR, IPL7SRS) ComparatorISR(void) {
     }
 }
 
+/**
+ * @brief Start a DC/fallback acquisition cycle after acknowledging Timer1.
+ * @note Priority 7; clears comparator timing history before ISRHigh(DCTimer).
+ */
 void __ISR(_TIMER_1_VECTOR, IPL7SRS) Timer1ISR(void) {
     mT1ClearIntFlag();
     H2LTime = 0;
@@ -426,12 +552,18 @@ void __ISR(_TIMER_1_VECTOR, IPL7SRS) Timer1ISR(void) {
     ISRHigh(DCTimer);
 }
 
+/** @brief Acknowledge/stop the priority-7 step timer and advance ISRHigh(). */
 void __ISR(_TIMER_2_VECTOR, IPL7SRS) Timer2ISR(void) {
     mT2ClearIntFlag();
     T2CONbits.ON = 0;
     ISRHigh(0);
 }
 
+/**
+ * @brief Sum a completed manual ADC batch and advance the acquisition step.
+ * @note Priority 7; mcuADCRES contains a sum, not an average. Automatic sampling
+ *       is handled by DMA instead of this manual-conversion interrupt path.
+ */
 void __ISR(_ADC_VECTOR, IPL7SRS) ADCISR(void) {
     int n, i = 0;
     for (n = AD1CON2bits.SMPI + 1; n--;)
@@ -441,6 +573,10 @@ void __ISR(_ADC_VECTOR, IPL7SRS) ADCISR(void) {
     ISRHigh(0);
 }
 
+/**
+ * @brief Acknowledge I2C4 interrupt sources and advance the bus state machine.
+ * @note Priority 6/software context; may be preempted by acquisition at priority 7.
+ */
 void __ISR(_I2C_4_VECTOR, IPL6SOFT) I2CISR(void) {
     INTClearFlag(INT_I2C4B);
     INTClearFlag(INT_I2C4M);
@@ -449,10 +585,19 @@ void __ISR(_I2C_4_VECTOR, IPL6SOFT) I2CISR(void) {
     I2CISRTasks();
 }
 
+/**
+ * @brief Acknowledge the reserved priority-5 OC2 interrupt without doing control work.
+ * @note Despite its name, this handler does not call PID(); ISRHigh() does.
+ */
 void __ISR(_OUTPUT_COMPARE_2_VECTOR, IPL5SOFT) PIDISR(void) {
     INTClearFlag(INT_OC2);
 }
 
+/**
+ * @brief Accumulate encoder phase-A movement and drain capture channel 1.
+ * @note Priority 4; step/sign depend on pars.Input, pars.Buttons, and B1/B3.
+ *       Updates the shared Enc counter; button-only mode contributes no movement.
+ */
 void __ISR(_INPUT_CAPTURE_1_VECTOR, IPL4SOFT) IC1ISR(void) {
     static int AInc[] = {0, 4, 2, 2, 1, 4};
     int inc;
@@ -469,6 +614,11 @@ void __ISR(_INPUT_CAPTURE_1_VECTOR, IPL4SOFT) IC1ISR(void) {
         mIC1ReadCapture();
     INTClearFlag(INT_IC1);
 }
+/**
+ * @brief Accumulate encoder phase-B movement and drain capture channel 3.
+ * @note Priority 4; only encoder modes enabled in BInc contribute to Enc.
+ *       Direction is derived from B1/B3 and the configured button reversal.
+ */
 void __ISR(_INPUT_CAPTURE_3_VECTOR, IPL4SOFT) IC3ISR(void) {
     static int BInc[] = {0, 0, 2, 0, 1, 4};
     int inc;
@@ -487,6 +637,11 @@ void __ISR(_INPUT_CAPTURE_3_VECTOR, IPL4SOFT) IC3ISR(void) {
 }
 
 int SPIAuto;
+/**
+ * @brief Clear SPI3 interrupt flags/enables and mark automatic SPI inactive.
+ * @note Current implementation neither closes SPI nor aborts a DMA transfer;
+ *       callers must not interpret its name as a full peripheral shutdown.
+ */
 void mcuSPIStop() {
     //DmaChnAbortTxfer(DMA_CHANNEL2);
     //mcuSPIClose();

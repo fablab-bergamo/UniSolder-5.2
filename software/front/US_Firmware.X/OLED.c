@@ -8,6 +8,18 @@
 #include "font8x16.h"
 #include "OLED.h"
 
+/**
+ * @file
+ * Framebuffer rendering and polled SPI output for the 128x64 OLED.
+ *
+ * Page APIs use pixel columns (0..127) and 8-pixel page rows (0..7); XY APIs use
+ * pixel coordinates. Drawing is not clipped: callers must keep every touched
+ * byte inside OLEDBUFF, including the extra page used by unaligned XY writes.
+ * Font glyphs contain width * height bytes, where height counts 8-pixel pages.
+ * Rendering modifies RAM only; OLEDUpdate() sends it. Foreground ownership is
+ * required for the shared framebuffer, command buffer, and SPI control pins.
+ */
+
 #define CmdNOP 0xE3
 #define CmdRot0 0xC0A0
 #define CmdRot180 0xC8A1
@@ -64,6 +76,14 @@ preUpdate_t PreUpdateBuff = {
     0x10,
     0};
 
+/**
+ * @brief Power-sequence the panel, detect its straps, and clear/send the framebuffer.
+ *
+ * Detects SH1106 versus SSD1306 and internal charge-pump selection through the
+ * CS/D-C pull resistors; configures the SH1106 column offset when needed.
+ * @pre Early MCU GPIO setup complete; no concurrent SPI/display users.
+ * @note Contains supply/reset delays and blocking SPI operations.
+ */
 void OLEDInit() {
     mcuSPIClose();
     OLED_VCC = 1; //Turn off display VCC
@@ -149,6 +169,13 @@ void OLEDInit() {
 //    mcuSPISendAuto(OLEDBUFF.B[0],128*8);
 //}
 
+/**
+ * @brief Send brightness, rotation, and all eight framebuffer pages over SPI.
+ * @pre pars.Bri/DispRot initialized to valid settings; display/SPI initialized.
+ * @note Serializes command/data transitions by waiting for SPI, but does not
+ *       explicitly wait for the final page's last byte before returning. Keep
+ *       framebuffer data stable until its transfer has been consumed.
+ */
 void OLEDUpdate() {
     UINT8 r;
     mcuSPIWait();
@@ -169,6 +196,12 @@ void OLEDUpdate() {
     }
 }
 
+/**
+ * @brief Fill a rectangular range of page bytes with the repeated pattern b.
+ * @param[in] col First pixel column; colnum is its nonnegative width in bytes.
+ * @param[in] row First 8-pixel page; rownum is the nonnegative number of pages.
+ * @pre The entire rectangle fits OLEDBUFF; no clipping or argument checks occur.
+ */
 void OLEDFill(int col, int colnum, int row, int rownum, UINT8 b) {
     int cc;
     while (rownum--) {
@@ -180,6 +213,15 @@ void OLEDFill(int col, int colnum, int row, int rownum, UINT8 b) {
     }
 }
 
+/**
+ * @brief Set/clear a pixel rectangle in the framebuffer, with no clipping.
+ * @param[in] x,y Pixel origin; dx/dy are nonnegative pixel extents.
+ * @param[in] b Nonzero sets selected bits; zero selects the clearing path.
+ * @pre All touched bytes fit OLEDBUFF.
+ * @warning The unaligned clearing path currently uses logical !mask and clears
+ *          whole touched bytes. It does not preserve pixels outside the rectangle;
+ *          use page-aligned clearing when those neighboring pixels must survive.
+ */
 void OLEDFillXY(int x, int dx, int y, int dy, int b) {
     if (!(y & 7) && !(dy & 7))
         return OLEDFill(x, dx, y >> 3, dy >> 3, b ? 255 : 0);
@@ -204,6 +246,10 @@ void OLEDFillXY(int x, int dx, int y, int dy, int b) {
     }
 }
 
+/**
+ * @brief XOR a page-aligned rectangle with 0xFF in the framebuffer.
+ * @pre Nonnegative colnum/rownum; column/page rectangle fits OLEDBUFF.
+ */
 void OLEDInvert(int col, int colnum, int row, int rownum) {
     int cc;
     while (rownum--) {
@@ -214,6 +260,10 @@ void OLEDInvert(int col, int colnum, int row, int rownum) {
     }
 }
 
+/**
+ * @brief XOR a pixel rectangle, preserving other bits in partially covered pages.
+ * @pre Nonnegative dx/dy; pixel rectangle fits the 128x64 framebuffer.
+ */
 void OLEDInvertXY(int x, int dx, int y, int dy) {
     if (!(y & 7) && !(dy & 7))
         return OLEDInvert(x, dx, y >> 3, dy >> 3);
@@ -232,6 +282,14 @@ void OLEDInvertXY(int x, int dx, int y, int dy) {
     }
 }
 
+/**
+ * @brief Copy page-organized bitmap bytes, wrapping every colnum columns.
+ * @param[in] col,row Destination pixel column and 8-pixel page index.
+ * @param[in] colnum Positive bitmap row width in bytes.
+ * @param[in] buf Readable source of at least num bytes; not modified.
+ * @param[in] num Nonnegative byte count; zero is a no-op.
+ * @pre All destination pages fit OLEDBUFF; no clipping or overlap handling.
+ */
 void OLEDWrite(int col, int colnum, int row, void *buf, int num) {
     while (num) {
         int cc = colnum;
@@ -245,6 +303,13 @@ void OLEDWrite(int col, int colnum, int row, void *buf, int num) {
     }
 }
 
+/**
+ * @brief Copy page-organized bitmap data at a pixel origin, splitting page edges.
+ * @param[in] x,y Pixel coordinates; colnum is the positive source row width.
+ * @param[in] buf Readable source of num bytes; num must be nonnegative.
+ * @pre Destination fits OLEDBUFF, including the extra page touched for y % 8 != 0.
+ * @note Preserves uncovered boundary bits; aligned y delegates to OLEDWrite().
+ */
 void OLEDWriteXY(int x, int colnum, int y, void *buf, int num) {
     if (!(y & 7))
         return OLEDWrite(x, colnum, y >> 3, buf, num);
@@ -273,6 +338,11 @@ void OLEDWriteXY(int x, int colnum, int y, void *buf, int num) {
     }
 }
 
+/**
+ * @brief Render the last three decimal digits using 32x48 glyphs, blanking leading zeros.
+ * @pre num is nonnegative; destination is a 96-column, six-page field that fits.
+ * @note col is the left pixel column, row the first page; zero still draws one digit.
+ */
 void OLEDPrintNum3248(int col, int row, int num) {
     int i, cd;
     col += 64;
@@ -288,6 +358,11 @@ void OLEDPrintNum3248(int col, int row, int num) {
         col -= 32;
     }
 }
+/**
+ * @brief Draw the large C/F unit glyph selected by CF (0 for C, 1 for F).
+ * @pre The 16-column, five-page destination and glyph index must be valid.
+ * @note Despite the legacy name, this implementation copies five 8-pixel pages.
+ */
 void OLEDPrintCF1648(int col, int row, int CF) {
     CF += 10;
     OLEDWrite(col, 16, row++, (void *)&numbers32x48[CF][0], 16);
@@ -297,6 +372,16 @@ void OLEDPrintCF1648(int col, int row, int CF) {
     OLEDWrite(col, 16, row++, (void *)&numbers32x48[CF][128], 16);
 }
 
+/**
+ * @brief Draw a right-aligned decimal integer in a fixed-width page-based field.
+ * @param[in] dec Positive number of character positions, not decimal places.
+ * @param[in] num Value whose magnitude is representable as a positive int.
+ * @param[in] font Glyph table containing digits and '-' as needed; startChar is
+ *                 the table's first character code, width/height its byte/page size.
+ * @param[in] blank Nonnegative spacing in pixels after each glyph.
+ * @pre Column/page destination fits; reserve a spare position for a negative sign.
+ * @note Excess high digits are discarded; leading positions are cleared.
+ */
 void OLEDPrintNum(int col, int row, int dec, int num, void *font, int startChar, int width, int height, int blank) {
     int cb = width * height;
     int cw = width + blank;
@@ -330,6 +415,14 @@ void OLEDPrintNum(int col, int row, int dec, int num, void *font, int startChar,
     }
 }
 
+/**
+ * @brief Draw decimal digits at pixel coordinates with OLEDPrintNum()'s font layout.
+ * @pre dec > 0; magnitude fits int; all glyph and spacing bytes fit OLEDBUFF,
+ *      including split-page writes.
+ * @warning The minus/leading-padding branches still call page-based helpers
+ *          with pixel y. Those branches are not correct for arbitrary pixel y;
+ *          the digit and spacing path also inherits OLEDFillXY()'s clearing limit.
+ */
 void OLEDPrintNumXY(int x, int y, int dec, int num, void *font, int startChar, int width, int height, int blank) {
     int cb = width * height;
     int cw = width + blank;
@@ -362,6 +455,11 @@ void OLEDPrintNumXY(int x, int y, int dec, int num, void *font, int startChar, i
         x -= cw;
     }
 }
+/**
+ * @brief Draw exactly dec uppercase hexadecimal digits, including leading zeros.
+ * @pre dec > 0; column/page destination fits; glyph table includes 0..9 and A..F.
+ * @note Uses OLEDPrintNum()'s font geometry; excess high-order nibbles are discarded.
+ */
 void OLEDPrintHex(int col, int row, int dec, unsigned int num, void *font, int startChar, int width, int height, int blank) {
     int cb = width * height;
     int cw = width + blank;
@@ -380,6 +478,13 @@ void OLEDPrintHex(int col, int row, int dec, unsigned int num, void *font, int s
     }
 }
 
+/**
+ * @brief Draw text at a pixel column/page row until NUL or the character limit.
+ * @param[in] s Readable characters present in the supplied font table.
+ * @param[in] num Nonnegative limit; zero means at most 128 characters, not unlimited.
+ * @pre Source is readable until NUL/limit, font geometry follows OLEDPrintNum(),
+ *      and the complete destination fits OLEDBUFF. No glyph-index bounds checks.
+ */
 void OLEDPrint(int col, int row, const char *s, int num, void *font, int startChar, int width, int height, int blank) {
     int cb = width * height;
     if (num == 0)
@@ -395,6 +500,12 @@ void OLEDPrint(int col, int row, const char *s, int num, void *font, int startCh
     }
 }
 
+/**
+ * @brief Draw bounded text at pixel coordinates using OLEDPrint()'s font contract.
+ * @pre All glyphs, spacing, and split-page writes fit OLEDBUFF; num >= 0.
+ * @note Zero num means a 128-character cap. Unaligned spacing clears inherit
+ *       OLEDFillXY()'s whole-byte clearing behavior.
+ */
 void OLEDPrintXY(int x, int y, const char *s, int num, void *font, int startChar, int width, int height, int blank) {
     int cb = width * height;
     if (num == 0)

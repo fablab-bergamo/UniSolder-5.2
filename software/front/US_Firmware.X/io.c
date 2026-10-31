@@ -105,7 +105,12 @@ void ProcessIO() {
                 }
                 break;
             case 3: //Set current iron PID parameters
-                IronPars.Config[0].SensorConfig.Gain = RXP.IronPars.Gain;
+                /* Match the hardware/PC gain range. Zero is a divisor hazard;
+                 * larger UINT16 values must not reach the analog setup simply
+                 * because a custom host bypasses the PC slider's 256 maximum.
+                 * Invalid gain retains the current value, as zero did before. */
+                if (RXP.IronPars.Gain >= 1 && RXP.IronPars.Gain <= 256)
+                    IronPars.Config[0].SensorConfig.Gain = RXP.IronPars.Gain;
                 IronPars.Config[0].PID_KP = RXP.IronPars.PID_KP;
                 IronPars.Config[0].PID_KI = RXP.IronPars.PID_KI;
                 IronPars.Config[0].PID_DGain = RXP.IronPars.PID_DGain;

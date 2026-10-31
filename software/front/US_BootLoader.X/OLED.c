@@ -49,6 +49,14 @@ preUpdate_t PreUpdateBuff = {
     {{0xB0,0x10,0}}
 };
 
+/**
+ * @brief Power-sequence and configure the recovery OLED using its resistor straps.
+ *
+ * Detects SH1106/SSD1306 and charge-pump selection, then sends initialization
+ * commands at maximum brightness. Unlike application OLEDInit(), does not clear
+ * or send OLEDBUFF. Call from foreground after early MCU GPIO initialization.
+ * @note Uses blocking SPI and supply/reset delays; owns the display control pins.
+ */
 void OLEDInit(){
     mcuSPIClose();
     OLED_VCC = 1;   //Turn off display VCC
@@ -119,6 +127,12 @@ void OLEDInit(){
     mcuSPISendBytes((unsigned int*)OLEDInitBuff2, sizeof(OLEDInitBuff2));     
 }
 
+/**
+ * @brief Send the eight 128-byte recovery framebuffer pages over SPI.
+ * @pre OLEDInit() complete and foreground owns OLEDBUFF/SPI control pins.
+ * @note Serializes page command/data changes, but does not explicitly wait for
+ *       the final page's last byte before return; callers must respect SPI use.
+ */
 void OLEDUpdate(){
     UINT8 r;
     for(r=0;r<=7;r++ ){

@@ -1,8 +1,32 @@
 # UniSolder - The universal soldering controller  ![License CC-BY-4.0](https://img.shields.io/badge/License-CC--BY--4.0-green.svg)
 Control almost any low voltage soldering instrument
 
-[![Build Windows Unisolder application](https://github.com/fablab-bergamo/UniSolder-5.2/actions/workflows/build-windows.yaml/badge.svg)](https://github.com/fablab-bergamo/UniSolder-5.2/actions/workflows/build-windows.yaml)
-[![Build Unisolder firmware](https://github.com/fablab-bergamo/UniSolder-5.2/actions/workflows/build-firmware.yaml/badge.svg)](https://github.com/fablab-bergamo/UniSolder-5.2/actions/workflows/build-firmware.yaml)
+> [!IMPORTANT]
+> **This is a fork used at [FabLab Bergamo](https://github.com/fablab-bergamo)**, not the official UniSolder repository.
+> The original project by sparkybg is at [sparkybg/UniSolder-5.2](https://github.com/sparkybg/UniSolder-5.2) - use it unless you need the changes below.
+> Hardware, bootloader and sensor firmware are unchanged; the main firmware (`US_Firmware.X`, version 1.3), the Windows PC application and the build workflows differ.
+>
+> **Functional changes from the original firmware:**
+> - **Forced instrument (new `MODEL` menu item)**: `AUTO` (default) keeps resistor-based identification; selecting a profile forces it regardless of the ID resistors. The header shows an inverted `FORCED` badge, since a swapped instrument is no longer detected in this mode. Added because a JBC C245 was intermittently identified as a WELLER WSP80 on our stations, overheating the tip.
+> - **ID change guard**: once an instrument is identified, a different ID is refused (heaters off, header shows `ID CHANGED - REPLUG`) until the connector reads fully open, i.e. the instrument has really been unplugged. A misread ID (bad contact, leakage) can no longer silently load the wrong profile during re-identification.
+> - **WELLER WSP80 ID resistor changed**: Rid1 (ID to Vout1-) is **330 ohm instead of 120 ohm** (see section 8 below). WSP80 irons wired for the original firmware are not recognised by this fork and vice versa.
+> - **FabLab Bergamo logo** on the startup screen.
+> - **Bug fixes**: divide-by-zero in the PID when heater power drops to 0, undefined shift in the sensor maths near 0 °C delta, `TEMP.STEP` displayed wrongly in Fahrenheit, `Gain=0` from the PC app ignored, first profile of the table not selectable in `MODEL`.
+> - **PID arithmetic**: the integral stays nonnegative even with `Kp=0`, preventing overflow into a positive heater request. Signed waveform/error scaling, compensation intermediates, and power normalization have explicit bounds and rounding. USB gain values outside 1..256 are ignored.
+>
+> **Changes to the Windows PC application** (also proposed upstream):
+> - **Log file** in `%LOCALAPPDATA%\UniSolder\UniSolder.log`: USB connection, commands and replies, PID changes, firmware update steps, errors.
+> - **Status bar** with the device connection state and the last log message; double-click it to open the log file.
+> - **Safer firmware update**: the HEX file is checked before anything is sent (wrong build such as `PIC32_Standalone` refused), and on any error the update stops without marking the firmware valid, so the device stays in bootloader mode and the update can be retried.
+> - **PID sliders are disabled when the parameters cannot be read** (no device, or device in bootloader), instead of showing zeros and then writing them to the iron.
+> - **USB robustness**: no lost replies or 100% CPU while waiting for a command, no crash when the device is unplugged or cannot be opened, no corrupted points in the live chart.
+> - **Display fixes**: DPI-aware layout, no more clipped or overlapping labels and buttons at display scaling other than 125% (e.g. 100%, 110%).
+> - **ClickOnce manifests unsigned**, so the application can be published without the original developer's certificate.
+>
+> CI workflows are updated (Node 24 actions, unsigned ClickOnce manifest for the Windows build).
+
+[![Windows Unisolder application](https://github.com/fablab-bergamo/UniSolder-5.2/actions/workflows/build-windows.yaml/badge.svg)](https://github.com/fablab-bergamo/UniSolder-5.2/actions/workflows/build-windows.yaml)
+[![Unisolder firmware](https://github.com/fablab-bergamo/UniSolder-5.2/actions/workflows/build-firmware.yaml/badge.svg)](https://github.com/fablab-bergamo/UniSolder-5.2/actions/workflows/build-firmware.yaml)
 
 <img width=500 align="center" src="/img/UniSolder52_small.jpg"/>
 
@@ -140,27 +164,8 @@ My intention was to build the most universal soldering controller I can think of
 
 ## Building instructions
 
-### How to build & load the firmware on Windows
-
-- Download MPLAB X IDE 4.20 (IDE)
-- Download & install XC32 v2.50 (compiler)
-- Download & install pic32 legacy peripheral libraries in C:\Program Files\Microchip\xc32\v2.50
-- Check instructions at https://github.com/cv007/XC3216/blob/master/xc32xc16-info.txt for specs file (if needed)
-- Open project from IDE
-- Build / Build Project
-- Load the produced HEX file using the Windows Unisolder application
-
-### How to build Windows tools on Windows
-
-- Install Visual Studio 2022 Community Edition with Desktop .net application workload
-- Open Solution file in /software/PC
-- Build All
-- Run UniSolder project
-
-### Using github actions
-
-- Fork the repository
-- Go to Actions, run manually the workflows and download the produced artifacts
+The [software component index](software/README.md) links the station firmware,
+bootloader, holder sensor, Windows application, and PC support-library READMEs.
 
 ### Firmware formatting
 
@@ -198,3 +203,55 @@ not enable them automatically for other contributors. The firmware formatting
 workflow remains enabled in CI to check contributions from clones without hooks.
 Keep the initial formatting baseline separate from functional firmware changes
 when reviewing history.
+
+### PID arithmetic regression tests
+
+The tests compile the production `PID.c` and profile/PID types, replacing only
+hardware-facing state and sensor conversion. Run with Python 3 and GCC in Linux
+or WSL; XC32 is not required:
+
+```sh
+python3 tools/test_pid.py --sanitize
+python3 tools/test_pid.py --sanitize --opt 0
+```
+
+For 32-bit little-endian MIPS arithmetic, install `gcc-mipsel-linux-gnu`,
+`libc6-dev-mipsel-cross`, and `qemu-user`, then run:
+
+```sh
+python3 tools/test_pid.py --cc mipsel-linux-gnu-gcc --runner qemu-mipsel
+```
+
+CI runs both native sanitizer and MIPS/QEMU checks. Regressions cover zero-Kp
+integral overflow, signed waveform scaling, compensation rounding, coefficient
+boundaries, power normalization, and fault-detection pulses. A nominal replay
+also checks unchanged integer results against the pre-fix MIPS baseline.
+These are arithmetic tests with synthetic readings, not PIC32 peripheral or
+thermal simulation; verify XC32 firmware size and ISR timing on hardware before
+deployment, especially after compiler or arithmetic changes.
+
+### How to build & load the firmware on Windows
+
+- Download MPLAB X IDE 4.20 (IDE)
+- Download & install XC32 v2.50 (compiler)
+- Download & install pic32 legacy peripheral libraries in C:\Program Files\Microchip\xc32\v2.50
+- Check instructions at https://github.com/cv007/XC3216/blob/master/xc32xc16-info.txt for specs file (if needed)
+- Open project from IDE
+- Build / Build Project
+- Load the produced HEX file using the Windows Unisolder application
+
+### How to build Windows tools on Windows
+
+See the [Windows application README](software/PC/README.md) for features,
+prerequisites, command-line builds, USB use, firmware updates, and troubleshooting.
+
+- Install Visual Studio 2022 Community Edition with Desktop .net application workload
+- Open Solution file in /software/PC
+- Build All
+- Run UniSolder project
+- The Windows application writes a log file to `%LOCALAPPDATA%\UniSolder\UniSolder.log` (USB connection, commands sent and received, PID changes, firmware update steps, errors). Attach it when reporting a problem.
+
+### Using github actions
+
+- Fork the repository
+- Go to Actions, run manually the workflows and download the produced artifacts

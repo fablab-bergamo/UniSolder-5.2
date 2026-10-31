@@ -16,6 +16,12 @@ volatile unsigned int ISRComplete = 0;
 volatile int I2CCommands;
 volatile int I2CCCommand;
 
+/**
+ * @brief Initialize acquisition, I2C mailboxes, and both channels' fault counters.
+ * @pre Call before enabling the interrupt sources configured by mcuInit4().
+ * @note Marks sensors/heaters faulty until measurements establish otherwise;
+ *       clears power-loss and calibration state without starting peripherals.
+ */
 void ISRInit() {
     int i;
     ISRStep = 0;
@@ -48,6 +54,14 @@ void ISRInit() {
     ISRComplete = 0;
 }
 
+/**
+ * @brief Request heater shutdown at the next cycle boundary and quiesce sensing.
+ *
+ * Waits for ISRHigh() to acknowledge and for the I2C engine to become idle, then
+ * stops the ADC, step timer, and comparator interrupt. Clears PowerLost.
+ * @pre Foreground only: acquisition and I2C interrupts must still be serviceable.
+ * @note Neither wait has a timeout; calling after acquisition has halted can hang.
+ */
 void ISRStop() {
     ISRStopped = 1;
     while (!(ISRStopped & 2))
@@ -60,6 +74,12 @@ void ISRStop() {
     mainFlags.PowerLost = 0;
 }
 
+/**
+ * @brief Restart acquisition, synchronizing to a mains edge when AC is selected.
+ * @pre Timing constants and peripheral setup must already be initialized.
+ * @note Waits for AC transitions without a timeout, clears PowerLost and the
+ *       stopped handshake, and unconditionally enables interrupts before return.
+ */
 void ISRStart() {
     mcuDisableInterrupts();
     mcuCompDisable();
@@ -80,6 +100,13 @@ void ISRStart() {
     mcuEnableInterrupts();
 }
 
+/**
+ * @brief Atomically request I2C operations and wake an idle interrupt engine.
+ * @param[in] c Bitwise OR of I2C_FLAGS values; repeated pending bits coalesce.
+ * @pre Populate the corresponding I2CData or EEPROM mailbox before requesting it.
+ * @note Restores the previous interrupt state. Lower command bits have priority;
+ *       this is a bitmask of pending work, not a queue of immutable snapshots.
+ */
 void I2CAddCommands(int c) {
     int i;
     i = mcuDisableInterrupts();
@@ -89,6 +116,13 @@ void I2CAddCommands(int c) {
     mcuRestoreInterrupts(i);
 }
 
+/**
+ * @brief Latch power loss and immediately remove heater and OLED supply drive.
+ *
+ * Stops acquisition sources and resets their steps on the first call only.
+ * EEPROM persistence is deferred to main(), where I2C interrupts can progress.
+ * @note Intended for acquisition interrupt context; does not wait for I2C.
+ */
 void OnPowerLost() {
     if (!mainFlags.PowerLost) {
         mainFlags.PowerLost = 1;
@@ -102,6 +136,17 @@ void OnPowerLost() {
     }
 }
 
+/**
+ * @brief Advance the mains-synchronized measurement and heater state machine.
+ * @param[in] src CompH2L or DCTimer starts a cycle; CompL2H is ignored here;
+ *                zero advances the current step after timer/ADC completion.
+ *
+ * Schedules quiet ADC windows, collects electrical measurements, invokes PID(),
+ * and gates heating at the full/half/quarter/eighth-power phase points. Shared
+ * ISRStep/ADCStep state assumes serialized priority-7 interrupt execution.
+ * @note Do not block here. Timing and buffer ownership depend on the hardware
+ *       interrupt sequence, not on a fixed frequency foreground call.
+ */
 void ISRHigh(int src) {
     static int OldHeater;
     t_PIDVars *PV;
@@ -422,6 +467,16 @@ void ISRHigh(int src) {
         ISRStep++;
 }
 
+/**
+ * @brief Advance one interrupt-driven I2C transaction step on I2C4.
+ *
+ * Selects the lowest pending command bit when idle. EEPROM operations yield at
+ * page boundaries or to higher-priority work, and retry after address NACKs.
+ * Completion releases the EEPROM mailbox with its 0xFFFF address marker.
+ * @pre Called by I2CISR() after acknowledging interrupt flags; mailbox buffers
+ *      must remain valid until completion.
+ * @note No timeout or terminal bus-error status is provided to waiting callers.
+ */
 void I2CISRTasks() {
 
     int i;

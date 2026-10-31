@@ -38,6 +38,14 @@ static inline INT64 PIDDivPow2Floor64(INT64 value, unsigned int bits) {
     return -1 - (INT64)(~(UINT64)value >> bits);
 }
 
+/**
+ * @brief Reset both duty accumulators and request temperature-filter startup.
+ *
+ * Marks the cold-junction reading invalid (-546, in half-degree Celsius units)
+ * and starts each channel in the lowest power band. Other measurement and filter
+ * fields are initialized later by the acquisition path and PID().
+ * @pre Run before acquisition starts, or while ISRStop() has quiesced it.
+ */
 void PIDInit() {
     int i;
     CJTemp = -273 * 2;
@@ -53,6 +61,14 @@ void PIDInit() {
     }
 };
 
+/**
+ * @brief Consume the latest cold-junction ADC sample from the foreground loop.
+ *
+ * Updates CJTemp in half-degree Celsius units for valid samples below 100 C.
+ * Missing profiles invalidate CJTemp; rejected samples retain its previous value.
+ * Clears ADCData.VCJ after inspection. This shares a mailbox with the ISR and
+ * does not guarantee that every produced sample is consumed.
+ */
 void PIDTasks() {
     t_SensorConfig *CJC = (t_SensorConfig *)IronPars.ColdJunctionSensorConfig;
     if (CJC && ADCData.VCJ && ADCData.VCJ < 1023) {
@@ -81,6 +97,23 @@ void PIDTasks() {
             a = b;        \
     }
 
+/**
+ * @brief Process one acquired sensor sample and calculate the next heater duty.
+ * @param[in] PIDStep Acquisition channel index, 0 or 1. Single-channel profiles
+ *                    use PIDVars[0] for either step; step 1 also updates CRTemp.
+ * @pre Called by ISRHigh() after the paired temperature readings are available.
+ *
+ * Applies heater-resistance compensation, waveform correction, temperature
+ * filtering, PI control with slope prediction, and power/current limiting.
+ * CTemp and ambient readings use half-degrees Celsius; CTTemp uses 2 C steps.
+ * PIDDuty uses a 24-bit fractional accumulator consumed by ISRHigh(), not a
+ * direct GPIO setting. Faults may request sparse heater-detection pulses;
+ * tip-change mode suppresses these as well as normal heating.
+ * @note Runs in the priority-7 acquisition ISR; do not add blocking operations.
+ * @note Signed scaling uses bounded multiplication and explicit rounding. The
+ *       integral invariant is [0, PID_DUTY_MAX], including when PID_KP is zero.
+ *       Recheck arithmetic bounds and ISR timing when changing ADC/profile limits.
+ */
 void PID(int PIDStep) {
     int i, w, AVG;
     INT32 dw, pdt;
@@ -106,6 +139,7 @@ void PID(int PIDStep) {
         PV->DestinationReached = 0;
     PV->LastTTemp = CTTemp;
 
+    /**** GET ROOM TEMPERATURE **********************************************************/
     if (PIDStep) {
         dw = ADCData.VRT;
         dw *= 147;
@@ -115,7 +149,9 @@ void PID(int PIDStep) {
         RTAvg += dw;
         CRTemp = PIDDivPow2Trunc(RTAvg, ADCAVG + 1);
     }
+    /************************************************************************************/
 
+    /**** GET HEATER RESISTANCE *********************************************************/
     if (PV->NoHeater)
         PV->NoHeaterCnt = (1 << (AVG + 1));
     if (PV->NoHeaterCnt)
@@ -155,10 +191,12 @@ void PID(int PIDStep) {
         if (PV->NoSensor || PV->ShortCircuit)
             PV->HPMax = 0;
     }
+    /************************************************************************************/
 
     PV->ADCTemp[1] = PV->ADCTemp[0];
     PV->ADCTemp[0] = ADCData.VTEMP[1];
 
+    /**** WAVE SHAPING *****************************************************/
     PV->WSCorr = 0;
     if (IC->WSLen) {
         if (PV->Starting || PV->NoHeaterCnt || PV->NoSensor || PV->ShortCircuit) {
@@ -246,13 +284,13 @@ void PID(int PIDStep) {
                 PV->OffCnt++;
         }
     }
-
+    /************************************************************************************/
     /* Use the correction directly for conversion, retaining its legacy x1024
      * stored scale. The old multiply/shift round trip relied on signed right
      * shift when the correction was negative. ADC-derived corrections fit here. */
     w = PV->WSCorr;
     PV->WSCorr *= 1024;
-
+    /**** GET AND NORMALISE IRON TEMPRATURE *********************************************/
     w += PV->ADCTemp[0];
     if (w < 0)
         w = 0;
@@ -407,6 +445,7 @@ void PID(int PIDStep) {
 
     PV->PIDDutyFull = pdt; //normalized duty
 
+    /**** RECALCULATE DUTY FOR REAL VS RATED POWER*********************************/
     //Duty=Duty * rated power / peak power
     pdt += 0x7FL;
     pdt >>= 8;
@@ -435,7 +474,9 @@ void PID(int PIDStep) {
             }
         }
     }
+    /******************************************************************************/
 
+    /**** RECALCULATE DUTY FOR MAX 6.0A RMS CURRENT******************************/
     dw = 0xFA00L;
     if (PV->HI) {
         dw = PV->HIAvg >> AVG;
@@ -447,6 +488,7 @@ void PID(int PIDStep) {
     }
     if (pdt > dw)
         pdt = dw;
+    /******************************************************************************/
 
     pdt <<= 8;
     if (PV->NoHeater)

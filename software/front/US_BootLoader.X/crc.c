@@ -1,5 +1,13 @@
 #include <GenericTypeDefs.h>
 
+/**
+ * @brief Update an MSB-first CRC-16 with polynomial 0x1021 and no final XOR.
+ * @param[in] scrc Initial CRC, or a previous return value for incremental use.
+ * @param[in] data Readable byte range of length len; not modified.
+ * @param[in] len Number of bytes; zero returns scrc without dereferencing data.
+ * @return Updated 16-bit CRC; application validation supplies seed 1234.
+ * @note Processes each byte high nibble first; no bounds or address checks.
+ */
 UINT16 CalculateCRC(UINT16 scrc, UINT8 *data, UINT32 len)
 {
 	static const UINT16 crc_table[16] =

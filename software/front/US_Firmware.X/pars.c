@@ -51,10 +51,20 @@ const t_ParDef ParDef[] = {
     {"   VERSION ", 0, 0, 0, 0, 0, 0, 0},                          //20
 };
 
+/**
+ * @brief Draw an enumerated parameter's string at a pixel column/page row.
+ * @pre par and num must index a valid ParDef entry and its Strings table;
+ *      the selected text must fit the framebuffer. No bounds checks are made.
+ */
 void ParDispStr(int par, int col, int row, int num) {
     OLEDPrint816(col, row, ParDef[par].Strings[num], 0);
 }
 
+/**
+ * @brief Draw AUTO (num <= 0) or a one-based instrument selection on two pages.
+ * @note Uses bounded six-character slices of IronDesc(); par is unused.
+ *       col is a pixel column and row is an 8-pixel page index.
+ */
 void ParDispInstr(int par, int col, int row, int num) {
     static const char *AUTO = " AUTO ";
 
@@ -68,12 +78,18 @@ void ParDispInstr(int par, int col, int row, int num) {
     OLEDPrint68(col, row + 1, &desc[6], 6);
 }
 
+/**
+ * @brief Draw a three-position decimal parameter and its optional suffix.
+ * @pre par must index ParDef; col is a pixel column and row an 8-pixel page.
+ *      Caller supplies a value and coordinates fitting the field/framebuffer.
+ */
 void ParDispNum(int par, int col, int row, int num) {
     OLEDPrintNum816(col, row, 3, num);
     if (ParDef[par].Suffix)
         OLEDPrint816(col + 24, row, ParDef[par].Suffix, 0);
 }
 
+/** @brief Draw OFF for zero, otherwise use ParDispNum() with its same contract. */
 void ParDispNumOff(int par, int col, int row, int num) {
     if (num) {
         ParDispNum(par, col, row, num);
@@ -82,11 +98,20 @@ void ParDispNumOff(int par, int col, int row, int num) {
     }
 }
 
+/**
+ * @brief Draw the degree symbol and C (zero) or F (nonzero) in a two-page field.
+ * @note par is unused; col is a pixel column and row an 8-pixel page index.
+ */
 void ParDispCF(int par, int col, int row, int num) {
     OLEDWrite(col, 4, row, (void *)degrees4x16, 8);
     OLEDPrint816(col + 4, row, num ? "F" : "C", 0);
 }
 
+/**
+ * @brief Render an absolute temperature stored in 2 C steps with its unit.
+ * @note pars.Deg selects Celsius/Fahrenheit; Fahrenheit includes the +32 offset.
+ *       Coordinates and parameter-index requirements are those of ParDispNum().
+ */
 void ParDispTemp(int par, int col, int row, int temp) {
     if (pars.Deg) {
         ParDispNum(par, col, row, ((temp * 461) >> 7) + 32);
@@ -96,6 +121,11 @@ void ParDispTemp(int par, int col, int row, int temp) {
     ParDispCF(par, col + 24, row, pars.Deg);
 }
 
+/**
+ * @brief Render a temperature interval stored in 2 C steps with its unit.
+ * @note Fahrenheit conversion is rounded and has no absolute-temperature offset.
+ *       Coordinates and parameter-index requirements are those of ParDispNum().
+ */
 void ParDispTempStep(int par, int col, int row, int temp) {
     if (pars.Deg) {
         ParDispNum(par, col, row, ((temp * 461) + 64) >> 7); //temperature difference: no +32 offset, rounded
@@ -105,6 +135,15 @@ void ParDispTempStep(int par, int col, int row, int temp) {
     ParDispCF(par, col + 24, row, pars.Deg);
 }
 
+/**
+ * @brief Restore parameter bytes and the last target temperature from EEPROM.
+ *
+ * Any out-of-range parameter resets the entire parameter block to defaults.
+ * Reads the target from a 64-byte ring at addresses 64..127, using an erased
+ * predecessor as its marker; defaults to 150 (300 C) if no valid entry is found.
+ * @pre Foreground only, after initializing the interrupt-driven I2C engine.
+ * @note Blocks through EEPRead(); no EEPROM failure status reaches the caller.
+ */
 void LoadPars(void) {
     int i;
     UINT8 b, oldb;
@@ -131,6 +170,15 @@ void LoadPars(void) {
     }
 }
 
+/**
+ * @brief Persist changed parameters and advance the target-temperature ring.
+ *
+ * Writes only differing parameter bytes. A changed target invalidates the old
+ * ring entry with 0xFF and writes the next slot, wrapping across addresses 64..127.
+ * This reduces repeated writes but is not a transactional power-fail guarantee.
+ * @pre Foreground only with I2C interrupts running and enough supply hold-up time.
+ * @note Blocking; final EEPROM internal write completion is not separately polled.
+ */
 void SavePars(void) {
     int i;
     UINT8 b, oldb;

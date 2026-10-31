@@ -76,6 +76,13 @@ static struct {
 static int LastEnc;
 static int EncDiff;
 
+/**
+ * @brief Initialize menu state, input tracking, and the requested temperature.
+ *
+ * Clears holder/tip-change state, initializes CTTemp from TTemp (both in 2 C
+ * steps), and opens the temperature-setting view. Does not load EEPROM settings.
+ * @pre Call during startup before polling MenuTasks().
+ */
 void MenuInit() {
     int i;
 
@@ -105,6 +112,16 @@ void MenuInit() {
     Enc = LastEnc = 0;
 }
 
+/**
+ * @brief Advance UI mode transitions, redraw the framebuffer, and send it to OLED.
+ * @param[in] powerLost Nonzero renders the shutdown message instead of handling
+ *                      the ordinary menu/input state machine.
+ *
+ * This is not a pure renderer: editing changes pars, calibration settings, and
+ * standby state. Uses button/encoder state collected by MenuTasks(); display
+ * readings may span different ISR updates. Calls blocking SPI display helpers.
+ * @pre Foreground only, with OLED initialized; not reentrant.
+ */
 void OLEDTasks(int powerLost) {
     int dual = IronPars.Config[1].SensorConfig.Type;
     t_PIDVars *PV1 = (t_PIDVars *)&PIDVars[0];
@@ -648,6 +665,17 @@ void OLEDTasks(int powerLost) {
     OLEDUpdate();
 }
 
+/**
+ * @brief Poll inputs, holder state, inactivity timers, and the effective target.
+ * @param[in] powerLost Nonzero draws shutdown status immediately, without waiting
+ *                      for a new acquisition tick.
+ *
+ * Normal work runs on changed odd ISRTicks values; a slow foreground loop skips
+ * missed ticks rather than catching up. Maintains CTTemp in 2 C steps, applies
+ * holder/sleep limits, controls tip-change inhibition, and services beep/display.
+ * Inactivity timing assumes the nominal acquisition cadence, not a wall clock.
+ * @pre Call regularly from the foreground loop after MenuInit().
+ */
 void MenuTasks(int powerLost) {
     int i;
     if (powerLost) {
